@@ -49,7 +49,6 @@
             "pages": [
               "providers/supported",
               "providers/coverage",
-              "providers/garmin-bridge-import",
               "providers/garmin-data-pipeline"
             ]
           },

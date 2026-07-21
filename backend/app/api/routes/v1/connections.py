@@ -11,7 +11,6 @@ from app.schemas.enums import ProviderName
 from app.schemas.model_crud.user_management import UserConnectionWithCapabilities
 from app.services import ApiKeyDep, user_connection_service
 from app.services.providers.factory import ProviderFactory
-from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 
 router = APIRouter()
 factory = ProviderFactory()
@@ -79,6 +78,5 @@ def disconnect_provider_endpoint(
 ) -> Response:
     """Disconnect a user from a provider, revoking the connection and clearing tokens."""
     strategy = ProviderFactory().get_provider(provider.value)
-    oauth = None if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED else strategy.oauth
-    user_connection_service.disconnect(db, user_id, provider.value, oauth=oauth)
+    user_connection_service.disconnect(db, user_id, provider.value, oauth=strategy.oauth)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

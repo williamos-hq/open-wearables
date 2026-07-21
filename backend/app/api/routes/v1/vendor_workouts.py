@@ -7,7 +7,6 @@ from app.database import DbSession
 from app.schemas.enums import ProviderName
 from app.services import ApiKeyDep
 from app.services.providers.factory import ProviderFactory
-from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 
 router = APIRouter()
 factory = ProviderFactory()
@@ -37,14 +36,14 @@ def get_user_workouts(
     samples: Annotated[bool, Query(description="Return sample data (Polar only)")] = False,
     zones: Annotated[bool, Query(description="Return zones data (Polar only)")] = False,
     route: Annotated[bool, Query(description="Return route data (Polar only)")] = False,
-    # Deprecated Garmin-only parameters retained for client compatibility.
+    # Garmin-specific parameters (backfill API - no pull token required)
     summary_start_time: Annotated[
         str | None,
-        Query(description="Deprecated; Garmin provider reads are unavailable"),
+        Query(description="Activity start time as Unix timestamp or ISO 8601 date (Garmin only)"),
     ] = None,
     summary_end_time: Annotated[
         str | None,
-        Query(description="Deprecated; Garmin provider reads are unavailable"),
+        Query(description="Activity end time as Unix timestamp or ISO 8601 date (Garmin only)"),
     ] = None,
 ) -> dict | list[dict]:
     """
@@ -52,12 +51,10 @@ def get_user_workouts(
 
     - **Suunto**: Returns workouts with pagination support
     - **Polar**: Returns exercises (Polar's term for workouts)
-    - **Garmin**: Unavailable here; use normalized Open Wearables workout reads
+    - **Garmin**: Returns activities from Health API
 
     Requires valid API key and active connection for the user.
     """
-    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin API reads are unavailable")
     strategy = factory.get_provider(provider.value)
 
     if not strategy.workouts:
@@ -99,12 +96,10 @@ def get_user_workout_detail(
 
     - **Suunto**: Returns detailed workout data
     - **Polar**: Returns detailed exercise data
-    - **Garmin**: Unavailable here; use normalized Open Wearables workout reads
+    - **Garmin**: Returns detailed activity data
 
     Requires valid API key and active connection for the user.
     """
-    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin API reads are unavailable")
     strategy = factory.get_provider(provider.value)
 
     if not strategy.workouts:

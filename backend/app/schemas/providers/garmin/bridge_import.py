@@ -79,13 +79,3 @@ class GarminFitImportResponse(BaseModel):
     byte_count: int
     decode_status: Literal["decoded", "invalid_crc", "decode_failed", "decode_partial"]
     decoded_messages: int
-
-
-class GarminPurgeResponse(BaseModel):
-    user_id: UUID
-    provider: Literal["garmin"] = "garmin"
-    native_records_deleted: int
-    data_sources_deleted: int
-    health_scores_deleted: int
-    connections_deleted: int
-    fit_objects_deleted: int

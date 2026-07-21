@@ -143,37 +143,12 @@ ID and the stable code `schema_drift`. It never echoes source payloads.
 }
 ```
 
-### Supported endpoint manifest
+### Supported endpoint allowlist
 
-The checked-in
-[`bridge_manifest_v1.json`](https://github.com/williamos-hq/open-wearables/blob/main/backend/app/services/providers/garmin/bridge_manifest_v1.json)
-file is the source of truth. The bridge mirrors that file and both repositories
-test their generated requests against it. Open Wearables rejects arbitrary
-method names before any write.
-
-| Kind | Source method | Cadence/request policy | Stable key | No-data response |
-|---|---|---|---|---|
-| `sleeps` | `get_sleep_data` | Daily; one local date | Sleep ID | Empty object |
-| `dailies` | `get_stats` | Daily; one local date | Profile date | Empty object |
-| `heart_rates` | `get_heart_rates` | Daily; one local date | Profile date | Empty object |
-| `hrv` | `get_hrv_data` | Daily; one local date | Profile date | `null` |
-| `pulse_ox` | `get_spo2_data` | Daily; one local date | Profile date | Empty object |
-| `respiration` | `get_respiration_data` | Daily; one local date | Profile date | Empty object |
-| `body_compositions` | `get_body_composition` | Daily; one local date | Timestamp + sequence | Empty list |
-| `stress_details` | `get_stress_data` | Daily; one local date | Profile date | Empty object |
-| `body_battery` | `get_body_battery` | Daily; one local date | Profile date + sequence | Empty list |
-| `blood_pressures` | `get_blood_pressure` | Daily; one local date | Timestamp + sequence | Empty list |
-| `skin_temperature` | `get_skin_temperature` | Daily; one local date | Profile date | Empty object |
-| `user_metrics` | `get_max_metrics` | Daily; one local date | Profile date | Empty object |
-| `fitness_age` | `get_fitnessage_data` | Weekly; one local date | Profile date | Empty object |
-| `training_readiness` | `get_training_readiness` | Daily; one local date | Timestamp + sequence | Empty list |
-| `training_status` | `get_training_status` | Daily; one local date | Profile date | Empty object |
-| `training_load` | `get_training_load_focus` | Daily; one local date | Profile date | Empty object |
-| `activities` | `get_activities_by_date` | Seven-day overlap; explicit bounded date range | Activity ID | Empty list |
-| `activity_details` | `get_activity` | On change; one activity ID | Activity ID | Not found |
-| `activity_laps` | `get_activity_splits` | On change; one activity ID | Activity ID | Empty object |
-| `activity_routes` | `get_activity_gps_data` | On change; one activity ID | Activity ID | Empty object |
-| `devices` | `get_devices` | Weekly; one bounded list | Device ID | Empty list |
+Open Wearables accepts only the kind and source-method pairs in its small
+Python normalization allowlist and rejects arbitrary method names before any
+write. The bridge owns polling cadence, stable-key construction, and no-data
+behavior; those transport details are intentionally not duplicated here.
 
 Some kinds are intentionally native-only until their normalized schema is
 stable. They are still scrubbed, hashed, stored, and counted.
@@ -250,7 +225,8 @@ reprocessing.
 
 | Status | Meaning | Bridge action |
 |---|---|---|
-| `200` | Transaction committed; inspect counts and normalization errors | Advance acknowledged cursor |
+| `200` | Import transaction committed; inspect counts and normalization errors | Advance acknowledged cursor |
+| `204` | Provider deletion committed | Treat the purge as complete |
 | `400` | Invalid `Content-Length` | Fix request; do not retry unchanged input |
 | `401` | Missing or incorrect bridge bearer secret | Stop and repair secret configuration |
 | `404` | The Garmin activity required by a FIT upload does not exist | Import the activity summary first |
@@ -269,8 +245,8 @@ credentialless connection rows, and every FIT object under that user's prefix.
 It then recomputes affected internal sleep scores from the remaining providers.
 Object deletion must succeed before the database transaction commits, so a
 failed deletion is retry-safe.
-Deleting an already absent user or already purged Garmin dataset succeeds with
-zero deletion counts, so bridge retries are safe.
+Deleting an already absent user or already purged Garmin dataset also returns
+`204`, so bridge retries are safe.
 
 ```bash
 curl --fail-with-body \
@@ -279,17 +255,7 @@ curl --fail-with-body \
   --header "Authorization: Bearer ${GARMIN_BRIDGE_INGEST_SECRET:?missing secret}"
 ```
 
-```json
-{
-  "user_id": "176be8de-8452-4eb7-a7ea-147fec925d9d",
-  "provider": "garmin",
-  "native_records_deleted": 32,
-  "data_sources_deleted": 1,
-  "health_scores_deleted": 4,
-  "connections_deleted": 0,
-  "fit_objects_deleted": 3
-}
-```
+The successful response is `204 No Content`.
 
 Back up PostgreSQL, the application encryption key, and the FIT bucket according
 to the deployment's recovery objectives. Test both restore and provider purge.

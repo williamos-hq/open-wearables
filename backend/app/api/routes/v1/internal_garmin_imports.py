@@ -17,11 +17,10 @@ from pydantic import ValidationError
 
 from app.config import settings
 from app.database import DbSession
-from app.schemas.providers.garmin import (
+from app.schemas.providers.garmin.bridge_import import (
     GarminBridgeImportRequest,
     GarminBridgeImportResponse,
     GarminFitImportResponse,
-    GarminPurgeResponse,
 )
 from app.services.fit_parser import FIT_MAX_MESSAGES, FitMessageLimitError, FitParseResult, parse_fit_file
 from app.services.providers.garmin.bridge_import import (
@@ -312,22 +311,21 @@ async def import_garmin_fit(
     )
 
 
-@router.delete("/internal/users/{user_id}/imports/garmin")
+@router.delete(
+    "/internal/users/{user_id}/imports/garmin",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 def purge_garmin_data(
     user_id: UUID,
     response: Response,
     db: DbSession,
     _bridge_auth: Annotated[None, Depends(_authenticate_bridge)],
-) -> GarminPurgeResponse:
+) -> None:
     response.headers["Cache-Control"] = "no-store"
     try:
-        result, object_keys = garmin_bridge_import_service.purge_user(db, user_id)
-        deleted_objects = purge_fit_prefix("garmin", str(user_id), required=bool(object_keys))
-        result.fit_objects_deleted = deleted_objects
+        object_keys = garmin_bridge_import_service.purge_user(db, user_id)
+        purge_fit_prefix("garmin", str(user_id), required=bool(object_keys))
         db.commit()
-    except GarminImportValidationError as exc:
-        _handle_service_validation(exc)
     except FitStorageError as exc:
         db.rollback()
         raise _http_error(status.HTTP_503_SERVICE_UNAVAILABLE, "FIT storage unavailable") from exc
-    return result

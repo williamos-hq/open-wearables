@@ -1,51 +1,23 @@
-import json
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
-
-
-@dataclass(frozen=True)
-class GarminBridgeEndpoint:
-    kind: str
-    source_method: str
-    normalization: str | None
-    cadence: str
-    key_rule: str
-    expected_no_data: str
-    request_policy: str
-    max_records: int
-
-
-GARMIN_BRIDGE_MANIFEST_PATH = Path(__file__).with_name("bridge_manifest_v1.json")
-
-
-def _load_manifest() -> tuple[GarminBridgeEndpoint, ...]:
-    raw: Any = json.loads(GARMIN_BRIDGE_MANIFEST_PATH.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict) or raw.get("contract_version") != 1:
-        raise RuntimeError("invalid Garmin bridge manifest version")
-    raw_endpoints = raw.get("endpoints")
-    if not isinstance(raw_endpoints, list) or not raw_endpoints:
-        raise RuntimeError("Garmin bridge manifest has no endpoints")
-
-    endpoints: list[GarminBridgeEndpoint] = []
-    for item in raw_endpoints:
-        if not isinstance(item, dict):
-            raise RuntimeError("invalid Garmin bridge manifest endpoint")
-        try:
-            endpoint = GarminBridgeEndpoint(**item)
-        except (TypeError, ValueError) as exc:
-            raise RuntimeError("invalid Garmin bridge manifest endpoint") from exc
-        if not 1 <= endpoint.max_records <= 50:
-            raise RuntimeError("invalid Garmin bridge manifest record limit")
-        endpoints.append(endpoint)
-
-    identities = {(endpoint.kind, endpoint.source_method) for endpoint in endpoints}
-    if len(identities) != len(endpoints):
-        raise RuntimeError("duplicate Garmin bridge manifest endpoint")
-    return tuple(endpoints)
-
-
-GARMIN_BRIDGE_ENDPOINT_LIST = _load_manifest()
-GARMIN_BRIDGE_ENDPOINTS: dict[tuple[str, str], GarminBridgeEndpoint] = {
-    (endpoint.kind, endpoint.source_method): endpoint for endpoint in GARMIN_BRIDGE_ENDPOINT_LIST
+GARMIN_BRIDGE_NORMALIZATIONS: dict[tuple[str, str], str | None] = {
+    ("sleeps", "get_sleep_data"): "sleeps",
+    ("dailies", "get_stats"): "dailies",
+    ("heart_rates", "get_heart_rates"): "dailies",
+    ("hrv", "get_hrv_data"): "hrv",
+    ("pulse_ox", "get_spo2_data"): "pulse_ox",
+    ("respiration", "get_respiration_data"): "respiration",
+    ("body_compositions", "get_body_composition"): "body_compositions",
+    ("stress_details", "get_stress_data"): "stress_details",
+    ("body_battery", "get_body_battery"): "stress_details",
+    ("blood_pressures", "get_blood_pressure"): "blood_pressures",
+    ("skin_temperature", "get_skin_temperature"): "skin_temperature",
+    ("user_metrics", "get_max_metrics"): "user_metrics",
+    ("fitness_age", "get_fitnessage_data"): "user_metrics",
+    ("training_readiness", "get_training_readiness"): "training_readiness",
+    ("training_status", "get_training_status"): None,
+    ("training_load", "get_training_load_focus"): None,
+    ("activities", "get_activities_by_date"): "activities",
+    ("activity_details", "get_activity"): "activity_details",
+    ("activity_laps", "get_activity_splits"): None,
+    ("activity_routes", "get_activity_gps_data"): None,
+    ("devices", "get_devices"): None,
 }

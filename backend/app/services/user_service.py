@@ -18,7 +18,6 @@ from app.schemas.model_crud.user_management import (
 )
 from app.schemas.utils import OldPaginatedResponse
 from app.services.providers.factory import ProviderFactory
-from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 from app.services.providers.garmin.backfill_state import force_release_backfill_lock
 from app.services.raw_payload_storage import purge_fit_prefix
 from app.services.services import AppService
@@ -79,9 +78,7 @@ class UserService(AppService[UserRepository, User, UserCreateInternal, UserUpdat
         provider_factory = ProviderFactory()
         connections = list(user_connection_service.get_connections_by_user(db_session, user.id))
         for connection in connections:
-            if (
-                connection.provider == "garmin" and not OFFICIAL_GARMIN_INTEGRATION_ENABLED
-            ) or not connection.access_token:
+            if not connection.access_token:
                 continue
             try:
                 strategy = provider_factory.get_provider(connection.provider)

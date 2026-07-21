@@ -36,7 +36,6 @@ from app.schemas.responses.incoming_webhooks import (
 )
 from app.services.providers.base_strategy import BaseProviderStrategy
 from app.services.providers.factory import ProviderFactory
-from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 from app.services.providers.templates.base_webhook_handler import BaseWebhookHandler
 from app.utils.auth import DeveloperDep
 
@@ -48,8 +47,6 @@ _factory = ProviderFactory()
 
 def _get_strategy(provider: str) -> BaseProviderStrategy:
     """Resolve and return the provider strategy, raising 404 for unknown providers."""
-    if provider == "garmin" and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
     try:
         return _factory.get_provider(provider)
     except ValueError:
@@ -65,8 +62,6 @@ def _get_webhook_handler(provider: str) -> BaseWebhookHandler:
     Raises ``404`` if the provider is unknown and ``501`` if the provider
     exists but has not yet implemented a ``BaseWebhookHandler``.
     """
-    if provider == "garmin" and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
     try:
         strategy = _factory.get_provider(provider)
     except ValueError:

@@ -1,7 +1,6 @@
 import hashlib
 import json
 from copy import deepcopy
-from dataclasses import asdict
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -24,12 +23,8 @@ from app.models import (
     WorkoutDetails,
 )
 from app.schemas.enums import HealthScoreCategory, ProviderName, SeriesType, get_series_type_id
-from app.schemas.providers.garmin import GarminBridgeImportRequest
-from app.services.providers.garmin.bridge_manifest import (
-    GARMIN_BRIDGE_ENDPOINT_LIST,
-    GARMIN_BRIDGE_ENDPOINTS,
-    GARMIN_BRIDGE_MANIFEST_PATH,
-)
+from app.schemas.providers.garmin.bridge_import import GarminBridgeImportRequest
+from app.services.providers.garmin.bridge_manifest import GARMIN_BRIDGE_NORMALIZATIONS
 from app.services.raw_payload_storage import FitStorageError
 from tests.fixtures.fit_builder import make_running_fit
 
@@ -37,26 +32,18 @@ BRIDGE_SECRET = "test-garmin-bridge-ingest-secret"
 BRIDGE_FIXTURE_DIR = Path(__file__).parents[2] / "fixtures" / "garmin" / "bridge_v1"
 
 
-def test_checked_in_manifest_contains_only_bounded_named_pairs() -> None:
-    raw_manifest = json.loads(GARMIN_BRIDGE_MANIFEST_PATH.read_text(encoding="utf-8"))
-    assert raw_manifest == {
-        "contract_version": 1,
-        "endpoints": [asdict(endpoint) for endpoint in GARMIN_BRIDGE_ENDPOINT_LIST],
-    }
-    assert GARMIN_BRIDGE_ENDPOINTS
-    for (kind, source_method), endpoint in GARMIN_BRIDGE_ENDPOINTS.items():
-        assert endpoint.kind == kind
-        assert endpoint.source_method == source_method
+def test_bridge_allowlist_contains_only_named_pairs() -> None:
+    assert GARMIN_BRIDGE_NORMALIZATIONS
+    for kind, source_method in GARMIN_BRIDGE_NORMALIZATIONS:
+        assert kind
         assert source_method.startswith("get_")
-        assert endpoint.request_policy
-        assert 1 <= endpoint.max_records <= 50
-    assert ("dailies", "get_user_summary") not in GARMIN_BRIDGE_ENDPOINTS
+    assert ("dailies", "get_user_summary") not in GARMIN_BRIDGE_NORMALIZATIONS
     assert {
         ("activity_details", "get_activity"),
         ("activity_routes", "get_activity_gps_data"),
         ("devices", "get_devices"),
         ("training_load", "get_training_load_focus"),
-    }.issubset(GARMIN_BRIDGE_ENDPOINTS)
+    }.issubset(GARMIN_BRIDGE_NORMALIZATIONS)
 
 
 def _bridge_fixture(path: Path) -> dict:
@@ -141,7 +128,7 @@ def test_bridge_generated_contract_fixtures_create_all_core_projections(
     fixtures = {
         _fixture_identity(fixture): fixture for fixture in map(_bridge_fixture, BRIDGE_FIXTURE_DIR.glob("*.json"))
     }
-    assert set(fixtures) == set(GARMIN_BRIDGE_ENDPOINTS)
+    assert set(fixtures) == set(GARMIN_BRIDGE_NORMALIZATIONS)
     for fixture in fixtures.values():
         GarminBridgeImportRequest.model_validate(fixture)
         native_bytes = json.dumps(
@@ -155,8 +142,8 @@ def test_bridge_generated_contract_fixtures_create_all_core_projections(
 
     expected_key = f"fit-files/garmin/{user.id}/987654/fixture.fit"
     with patch.object(settings, "garmin_bridge_ingest_secret", SecretStr(BRIDGE_SECRET)):
-        for endpoint in GARMIN_BRIDGE_ENDPOINT_LIST:
-            fixture = fixtures[(endpoint.kind, endpoint.source_method)]
+        for identity in GARMIN_BRIDGE_NORMALIZATIONS:
+            fixture = fixtures[identity]
             response = client.post(path, json=fixture, headers=_headers())
             assert response.status_code == 200
             assert response.json()["normalization_errors"] == 0
@@ -734,8 +721,8 @@ def test_purge_removes_database_records_and_fit_prefix(
         ) as delete_prefix:
             response = client.delete(json_path, headers=_headers())
 
-    assert response.status_code == 200
-    assert response.json()["fit_objects_deleted"] == 1
+    assert response.status_code == 204
+    assert response.content == b""
     delete_prefix.assert_called_once_with("garmin", str(user_id), required=True)
     assert db.query(ProviderNativeRecord).count() == 0
     assert db.query(DataSource).filter_by(user_id=user_id, provider=ProviderName.GARMIN).count() == 0
@@ -752,16 +739,8 @@ def test_purge_is_idempotent_when_user_is_absent(client: TestClient) -> None:
     ):
         response = client.delete(f"/api/v1/internal/users/{user_id}/imports/garmin", headers=_headers())
 
-    assert response.status_code == 200
-    assert response.json() == {
-        "user_id": str(user_id),
-        "provider": "garmin",
-        "native_records_deleted": 0,
-        "data_sources_deleted": 0,
-        "health_scores_deleted": 0,
-        "connections_deleted": 0,
-        "fit_objects_deleted": 0,
-    }
+    assert response.status_code == 204
+    assert response.content == b""
     delete_prefix.assert_called_once_with("garmin", str(user_id), required=False)
 
 
@@ -787,10 +766,8 @@ def test_purge_without_garmin_rows_preserves_internal_scores(
     ):
         response = client.delete(f"/api/v1/internal/users/{user.id}/imports/garmin", headers=_headers())
 
-    assert response.status_code == 200
-    assert response.json()["native_records_deleted"] == 0
-    assert response.json()["data_sources_deleted"] == 0
-    assert response.json()["health_scores_deleted"] == 0
+    assert response.status_code == 204
+    assert response.content == b""
     assert db.query(HealthScore).filter_by(id=score.id).one().value == Decimal("44.2")
 
 
@@ -800,9 +777,8 @@ def test_official_garmin_entry_points_are_unavailable(
     api_key_header: dict[str, str],
 ) -> None:
     user_id = user.id
-    assert client.get(f"/api/v1/oauth/garmin/authorize?user_id={user_id}").status_code == 404
-    assert client.get("/api/v1/oauth/garmin/callback?error=access_denied").status_code == 404
-    assert client.post("/api/v1/providers/garmin/webhooks", json={}).status_code == 404
+    assert client.get(f"/api/v1/oauth/garmin/authorize?user_id={user_id}").status_code == 400
+    assert client.post("/api/v1/providers/garmin/webhooks", json={}).status_code == 501
     assert client.post("/api/v1/garmin/webhooks/push", json={}).status_code == 404
     assert client.post(f"/api/v1/providers/garmin/users/{user_id}/sync", headers=api_key_header).status_code == 404
     assert (

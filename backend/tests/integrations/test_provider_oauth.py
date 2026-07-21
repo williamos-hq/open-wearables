@@ -36,7 +36,7 @@ class TestGarminOAuth:
             follow_redirects=False,
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 400
 
     @patch("httpx.AsyncClient")
     def test_garmin_callback_success(
@@ -79,7 +79,7 @@ class TestGarminOAuth:
             follow_redirects=False,
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 303
 
     def test_garmin_callback_error(
         self,
@@ -105,7 +105,7 @@ class TestGarminOAuth:
         )
 
         # Assert
-        assert response.status_code == 404
+        assert response.status_code == 303
 
 
 class TestPolarOAuth:

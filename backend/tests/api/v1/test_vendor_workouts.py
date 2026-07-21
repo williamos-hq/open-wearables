@@ -44,7 +44,7 @@ class TestVendorWorkoutsEndpoints:
         db: Session,
         mock_provider_factory: MagicMock,
     ) -> None:
-        """Garmin provider API reads are unavailable in the import-only fork."""
+        """Test successfully retrieving Garmin workouts with valid API key."""
         # Arrange
         user = UserFactory()
         api_key = ApiKeyFactory()
@@ -57,8 +57,13 @@ class TestVendorWorkoutsEndpoints:
         )
 
         # Assert
-        assert response.status_code == 404
-        mock_provider_factory.get_provider.assert_not_called()
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+        assert data[0]["id"] == "123"
+        assert data[0]["type"] == "running"
+        mock_provider_factory.get_provider.assert_called_once_with("garmin")
 
     def test_get_garmin_workouts_unauthorized(self, client: TestClient, db: Session) -> None:
         """Test that missing API key returns 401."""
@@ -208,7 +213,7 @@ class TestVendorWorkoutsEndpoints:
         db: Session,
         mock_provider_factory: MagicMock,
     ) -> None:
-        """Garmin provider workout-detail reads are unavailable."""
+        """Test successfully retrieving workout detail."""
         # Arrange
         user = UserFactory()
         api_key = ApiKeyFactory()
@@ -222,8 +227,12 @@ class TestVendorWorkoutsEndpoints:
         )
 
         # Assert
-        assert response.status_code == 404
-        mock_provider_factory.get_provider.assert_not_called()
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "123"
+        assert data["type"] == "running"
+        assert "details" in data
+        mock_provider_factory.get_provider.return_value.workouts.get_workout_detail_from_api.assert_called_once()
 
     def test_get_workout_detail_not_found(
         self,

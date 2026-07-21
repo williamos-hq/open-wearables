@@ -16,11 +16,10 @@ from app.repositories import (
     EventRecordDetailRepository,
     EventRecordRepository,
     HealthScoreRepository,
-    ProviderNativeRecordRepository,
     UserConnectionRepository,
     UserRepository,
 )
-from app.repositories.provider_native_record_repository import NativeWriteStatus
+from app.repositories.provider_native_record_repository import NativeWriteStatus, ProviderNativeRecordRepository
 from app.schemas.enums import HealthScoreCategory, ProviderName
 from app.schemas.model_crud.activities import (
     EventRecordCreate,
@@ -28,16 +27,15 @@ from app.schemas.model_crud.activities import (
     HealthScoreCreate,
     ScoreComponent,
 )
-from app.schemas.providers.garmin import (
+from app.schemas.providers.garmin.bridge_import import (
     GarminBridgeImportRequest,
     GarminBridgeImportResponse,
     GarminBridgeRecord,
     GarminNormalizationError,
-    GarminPurgeResponse,
 )
 from app.services.event_record_service import event_record_service
 from app.services.fit_parser import FIT_PARSER_NAME, FIT_PARSER_VERSION, FitParseResult
-from app.services.providers.garmin.bridge_manifest import GARMIN_BRIDGE_ENDPOINTS, GarminBridgeEndpoint
+from app.services.providers.garmin.bridge_manifest import GARMIN_BRIDGE_NORMALIZATIONS
 from app.services.providers.garmin.normalizer import GarminNormalizer
 from app.services.scores.resilience_service import resilience_score_service
 
@@ -133,11 +131,11 @@ class GarminBridgeImportService:
         self.data_source_repo = DataSourceRepository()
         self.connection_repo = UserConnectionRepository()
 
-    def validate_endpoint(self, kind: str, source_method: str) -> GarminBridgeEndpoint:
-        endpoint = GARMIN_BRIDGE_ENDPOINTS.get((kind, source_method))
-        if endpoint is None:
+    def validate_endpoint(self, kind: str, source_method: str) -> str | None:
+        key = (kind, source_method)
+        if key not in GARMIN_BRIDGE_NORMALIZATIONS:
             raise GarminImportValidationError("unsupported_kind_source_method")
-        return endpoint
+        return GARMIN_BRIDGE_NORMALIZATIONS[key]
 
     def validate_user(self, db: DbSession, user_id: UUID) -> None:
         if self.user_repo.get(db, user_id) is None:
@@ -150,7 +148,7 @@ class GarminBridgeImportService:
         request: GarminBridgeImportRequest,
     ) -> GarminBridgeImportResponse:
         self.validate_user(db, user_id)
-        endpoint = self.validate_endpoint(request.kind, request.source_method)
+        normalization = self.validate_endpoint(request.kind, request.source_method)
         counts = {"inserted": 0, "updated": 0, "unchanged": 0}
         errors: list[GarminNormalizationError] = []
         observed_at = datetime.now(timezone.utc)
@@ -183,7 +181,7 @@ class GarminBridgeImportService:
             )
             counts[write_status] += 1
 
-            if endpoint.normalization is None:
+            if normalization is None:
                 continue
             native_record = existing_native or self.native_repo.get_by_identity(
                 db,
@@ -204,7 +202,7 @@ class GarminBridgeImportService:
                 self._normalize_record(
                     db,
                     user_id,
-                    endpoint.normalization,
+                    normalization,
                     record,
                     canonical,
                     previous_recorded_at=previous_recorded_at,
@@ -498,19 +496,9 @@ class GarminBridgeImportService:
             raise GarminImportValidationError("activity_not_found")
         return event.id
 
-    def purge_user(self, db: DbSession, user_id: UUID) -> tuple[GarminPurgeResponse, list[str]]:
+    def purge_user(self, db: DbSession, user_id: UUID) -> list[str]:
         if self.user_repo.get(db, user_id) is None:
-            return (
-                GarminPurgeResponse(
-                    user_id=user_id,
-                    native_records_deleted=0,
-                    data_sources_deleted=0,
-                    health_scores_deleted=0,
-                    connections_deleted=0,
-                    fit_objects_deleted=0,
-                ),
-                [],
-            )
+            return []
         object_keys = self.native_repo.get_fit_object_keys(db, user_id)
         sleep_dates: set[date] = {
             event_record_service._local_sleep_date(start_datetime, zone_offset)
@@ -520,10 +508,10 @@ class GarminBridgeImportService:
                 ProviderName.GARMIN.value,
             )
         }
-        native_deleted = self.native_repo.delete_for_user(db, user_id)
-        scores_deleted = self.score_repo.delete_by_user_provider(db, user_id, ProviderName.GARMIN.value)
+        self.native_repo.delete_for_user(db, user_id)
+        self.score_repo.delete_by_user_provider(db, user_id, ProviderName.GARMIN.value)
         sources_deleted = self.data_source_repo.delete_by_user_provider(db, user_id, ProviderName.GARMIN)
-        connections_deleted = self.connection_repo.delete_by_user_provider(db, user_id, ProviderName.GARMIN.value)
+        self.connection_repo.delete_by_user_provider(db, user_id, ProviderName.GARMIN.value)
         db.flush()
         if sleep_dates:
             event_record_service._recompute_sleep_scores(db, user_id, sleep_dates)
@@ -539,17 +527,7 @@ class GarminBridgeImportService:
                 .all()
             }
             self._recompute_resilience_scores(db, user_id, resilience_dates)
-        return (
-            GarminPurgeResponse(
-                user_id=user_id,
-                native_records_deleted=native_deleted,
-                data_sources_deleted=sources_deleted,
-                health_scores_deleted=scores_deleted,
-                connections_deleted=connections_deleted,
-                fit_objects_deleted=0,
-            ),
-            object_keys,
-        )
+        return object_keys
 
     def _recompute_resilience_scores(self, db: DbSession, user_id: UUID, score_dates: set[date]) -> None:
         for score_date in score_dates:
