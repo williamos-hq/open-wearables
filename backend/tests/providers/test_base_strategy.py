@@ -95,13 +95,13 @@ class TestBaseProviderStrategy:
         assert strategy.display_name == "Apple Health"
 
     def test_garmin_has_cloud_api(self) -> None:
-        """Import-only Garmin stays hidden even though normalizer dependencies exist."""
+        """Should return True for has_cloud_api when OAuth is present."""
         # Act
         strategy = GarminStrategy()
 
         # Assert
-        assert strategy.has_cloud_api is False
-        assert strategy.oauth is None
+        assert strategy.has_cloud_api is True
+        assert strategy.oauth is not None
 
     def test_apple_no_cloud_api(self) -> None:
         """Should return False for has_cloud_api when OAuth is absent."""

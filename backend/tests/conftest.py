@@ -238,7 +238,14 @@ def mock_celery_tasks(monkeypatch: pytest.MonkeyPatch) -> Generator[MagicMock, N
     mock_task.delay.return_value = MagicMock()
     mock_task.apply_async.return_value = MagicMock()
 
-    with patch("celery.current_app") as mock_celery:
+    mock_handler_celery = MagicMock()
+    mock_handler_celery.send_task.return_value.id = "mock-task-id"
+
+    with (
+        patch("celery.current_app") as mock_celery,
+        # Prevent webhook handler from dispatching the backfill Celery task
+        patch("app.services.providers.garmin.webhook_handler.celery_app", mock_handler_celery),
+    ):
         # Configure Celery to use in-memory broker and result backend
         # We Mock the conf object to return our test settings
         mock_conf = MagicMock()
@@ -279,6 +286,8 @@ def mock_external_apis() -> Generator[dict[str, MagicMock], None, None]:
     mock_s3.head_bucket.return_value = {}
     mock_s3.put_object.return_value = {"ETag": "test-etag"}
 
+    garmin_handler = "app.services.providers.garmin.webhook_handler"
+
     with (
         patch("httpx.AsyncClient") as mock_httpx,
         patch("boto3.client", return_value=mock_s3) as mock_boto3,
@@ -290,6 +299,11 @@ def mock_external_apis() -> Generator[dict[str, MagicMock], None, None]:
         patch("app.integrations.celery.tasks.process_aws_upload_task.get_s3_client", return_value=mock_s3),
         patch(
             "app.services.apple.apple_xml.presigned_url_service.presigned_url_service.s3_client", mock_s3, create=True
+        ),
+        patch(f"{garmin_handler}.mark_type_success", return_value=False),
+        patch(
+            f"{garmin_handler}.get_backfill_status",
+            return_value={"overall_status": "complete", "current_window": 0, "total_windows": 0},
         ),
     ):
         mocks["httpx"] = mock_httpx

@@ -18,6 +18,8 @@ from app.schemas.model_crud.user_management import (
 )
 from app.schemas.utils import OldPaginatedResponse
 from app.services.providers.factory import ProviderFactory
+from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
+from app.services.providers.garmin.backfill_state import force_release_backfill_lock
 from app.services.raw_payload_storage import purge_fit_prefix
 from app.services.services import AppService
 from app.services.sync_coordination import release_stale_primary
@@ -77,7 +79,9 @@ class UserService(AppService[UserRepository, User, UserCreateInternal, UserUpdat
         provider_factory = ProviderFactory()
         connections = list(user_connection_service.get_connections_by_user(db_session, user.id))
         for connection in connections:
-            if not connection.access_token:
+            if (
+                connection.provider == "garmin" and not OFFICIAL_GARMIN_INTEGRATION_ENABLED
+            ) or not connection.access_token:
                 continue
             try:
                 strategy = provider_factory.get_provider(connection.provider)
@@ -93,16 +97,19 @@ class UserService(AppService[UserRepository, User, UserCreateInternal, UserUpdat
                     error=str(e),
                 )
 
-        # Release pull locks before DB deletion while provider_user_id is available.
+        # Release any Redis locks held by this user before DB deletion.
+        # Must happen before DB delete so we still have provider_user_id from connections.
         try:
             for connection in connections:
                 if connection.provider_user_id:
-                    release_stale_primary(connection.provider, connection.provider_user_id, scope="pull")
+                    for scope in ("pull", "backfill"):
+                        release_stale_primary(connection.provider, connection.provider_user_id, scope=scope)
+            force_release_backfill_lock(user.id)
         except Exception as e:
             log_structured(
                 self.logger,
                 "warning",
-                "Failed to release Redis pull locks on user deletion",
+                "Failed to release Redis locks on user deletion",
                 user_id=user.id,
                 error=str(e),
             )

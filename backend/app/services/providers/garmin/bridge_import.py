@@ -38,7 +38,7 @@ from app.schemas.providers.garmin import (
 from app.services.event_record_service import event_record_service
 from app.services.fit_parser import FIT_PARSER_NAME, FIT_PARSER_VERSION, FitParseResult
 from app.services.providers.garmin.bridge_manifest import GARMIN_BRIDGE_ENDPOINTS, GarminBridgeEndpoint
-from app.services.providers.garmin.strategy import GarminStrategy
+from app.services.providers.garmin.normalizer import GarminNormalizer
 from app.services.scores.resilience_service import resilience_score_service
 
 GARMIN_NATIVE_RECORD_MAX_BYTES = 256 * 1024
@@ -123,8 +123,7 @@ def canonical_json_bytes(value: Any) -> bytes:
 
 class GarminBridgeImportService:
     def __init__(self) -> None:
-        strategy = GarminStrategy()
-        self.normalizer = strategy.create_normalizer()
+        self.normalizer = GarminNormalizer()
         self.user_repo = UserRepository(User)
         self.native_repo = ProviderNativeRecordRepository()
         self.event_repo = EventRecordRepository(EventRecord)

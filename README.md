@@ -116,6 +116,10 @@ Get Open Wearables up and running in minutes.
 
 ## Core Features
 
+> **WilliamOS fork:** Garmin data is imported through a private bridge. The upstream official Garmin implementation is
+> retained for easier upstream synchronization, but its OAuth, webhook, backfill, sync, and provider-read entry points
+> are disabled in this fork. See the [Garmin bridge import guide](docs/providers/garmin-bridge-import.mdx).
+
 ### Developer Portal Dashboard
 Web-based dashboard for managing your integration:
 - 📈 **General Statistics**: View number of users and data points at a glance
@@ -142,8 +146,7 @@ The platform's most powerful feature - define intelligent health insights using 
 Access health data through a consistent REST API regardless of the source device.
 
 ### Provider Support
-- ☁️ **Cloud-based**: Oura, Whoop, Suunto, Polar, Ultrahuman, Strava, Fitbit
-- 🔒 **Private bridge import**: Garmin (WilliamOS fork only; no official Garmin OAuth or provider API access)
+- ☁️ **Cloud-based**: Garmin, Oura, Whoop, Suunto, Polar, Ultrahuman, Strava, Fitbit
 - 📱 **SDK-based**: Apple HealthKit, Samsung Health, Google Health Connect
 
 ### OAuth Flow Management
@@ -152,9 +155,6 @@ Simplified connection process for end users:
 2. User authenticates with their wearable provider
 3. Data automatically syncs to your platform
 4. Access via unified API
-
-Garmin is not part of this OAuth flow in the WilliamOS fork. Its private bridge owns authentication and imports
-normalized observations through the internal Garmin ingest contract.
 
 ### Mobile Sync SDKs
 Native SDKs for push-based health data sync from on-device health stores:
@@ -184,9 +184,8 @@ The platform is designed for self-hosting, meaning each deployment serves a sing
 **Available**:
 - Developer portal
 - User management (via API and developer portal)
-- OAuth flow for Polar and Suunto
-- Workout data sync and API access for Polar and Suunto
-- Garmin health and workout import through the private WilliamOS bridge
+- OAuth flow for Garmin, Polar, and Suunto
+- Workout data sync and API access for Garmin, Polar, and Suunto
 - Mobile Sync SDKs (iOS, Android, Flutter, React Native)
 
 **In Development**:

@@ -133,6 +133,12 @@ class Settings(BaseSettings):
     suunto_webhook_secret: SecretStr | None = None
     # Derived from secret_key if not set — configure the same value in Suunto developer portal.
 
+    # GARMIN OAUTH SETTINGS
+    garmin_client_id: str | None = None
+    garmin_client_secret: SecretStr | None = None
+    garmin_redirect_uri: str | None = None  # Deprecated: use API_BASE_URL
+    garmin_default_scope: str = ""  # Scope is managed at app creation in Garmin Developer Portal
+
     # POLAR OAUTH SETTINGS
     polar_client_id: str | None = None
     polar_client_secret: SecretStr | None = None

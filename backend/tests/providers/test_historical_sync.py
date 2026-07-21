@@ -104,13 +104,34 @@ class TestPullBasedHistoricalSync:
 
 
 class TestGarminHistoricalSync:
-    """Garmin history is supplied only through the private bridge."""
+    """Tests for Garmin's overridden start_historical_sync."""
 
-    def test_historical_sync_is_unsupported(self) -> None:
+    @patch("app.services.providers.garmin.strategy.start_garmin_full_backfill")
+    def test_dispatches_backfill_task(self, mock_backfill: MagicMock) -> None:
+        """Garmin should dispatch start_garmin_full_backfill, not sync_vendor_data."""
+        mock_backfill.delay.return_value = MagicMock(id="task-garmin-789")
         user_id = uuid4()
 
-        with pytest.raises(UnsupportedProviderError, match="garmin"):
-            GarminStrategy().start_historical_sync(user_id, days=90)
+        result = GarminStrategy().start_historical_sync(user_id, days=90)
+
+        assert isinstance(result, HistoricalSyncResult)
+        assert result.task_id == "task-garmin-789"
+        assert result.method == "webhook_backfill"
+        assert result.days is None  # Garmin ignores days param
+        assert result.start_date is None
+        assert result.end_date is None
+        mock_backfill.delay.assert_called_once_with(str(user_id))
+
+    @patch("app.services.providers.garmin.strategy.start_garmin_full_backfill")
+    def test_ignores_days_parameter(self, mock_backfill: MagicMock) -> None:
+        """Garmin always uses its own 30-day limit regardless of days param."""
+        mock_backfill.delay.return_value = MagicMock(id="task-123")
+        user_id = uuid4()
+
+        result = GarminStrategy().start_historical_sync(user_id, days=365)
+
+        assert result.days is None
+        mock_backfill.delay.assert_called_once_with(str(user_id))
 
 
 class TestUnsupportedHistoricalSync:

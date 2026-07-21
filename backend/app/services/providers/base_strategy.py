@@ -187,7 +187,7 @@ class BaseProviderStrategy(ABC):
         """Dispatch an async historical data sync.
 
         Default implementation works for pull-based providers. Override for
-        providers that use a different historical-export mechanism.
+        providers that use a different mechanism (e.g. Garmin webhook backfill).
 
         Raises UnsupportedProviderError for providers that don't support historical sync.
         """

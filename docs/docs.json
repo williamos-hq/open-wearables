@@ -49,6 +49,7 @@
             "pages": [
               "providers/supported",
               "providers/coverage",
+              "providers/garmin-bridge-import",
               "providers/garmin-data-pipeline"
             ]
           },
@@ -205,6 +206,9 @@
             "group": "Data Sync",
             "pages": [
               "POST /api/v1/providers/{provider}/users/{user_id}/sync",
+              "GET /api/v1/providers/garmin/users/{user_id}/backfill/status",
+              "POST /api/v1/providers/garmin/users/{user_id}/backfill/cancel",
+              "POST /api/v1/providers/garmin/users/{user_id}/backfill/{type_name}/retry",
               "POST /api/v1/providers/{provider}/users/{user_id}/sync/historical"
             ]
           },

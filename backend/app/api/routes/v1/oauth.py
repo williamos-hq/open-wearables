@@ -18,6 +18,7 @@ from app.services import DeveloperDep, user_connection_service
 from app.services.provider_settings_service import ProviderSettingsService
 from app.services.providers.base_strategy import BaseProviderStrategy
 from app.services.providers.factory import ProviderFactory
+from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 
 router = APIRouter()
 factory = ProviderFactory()
@@ -26,7 +27,7 @@ settings_service = ProviderSettingsService()
 
 def get_oauth_strategy(provider: ProviderName) -> BaseProviderStrategy:
     """Helper to get provider strategy and ensure it supports OAuth."""
-    if provider == ProviderName.GARMIN:
+    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin OAuth is unavailable")
     strategy = factory.get_provider(provider.value)
 
@@ -76,7 +77,7 @@ def oauth_callback(
 
     Provider redirects here after user authorizes. Exchanges code for tokens.
     """
-    if provider == ProviderName.GARMIN:
+    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin OAuth is unavailable")
 
     if error:
@@ -106,7 +107,10 @@ def oauth_callback(
     if settings.historical_sync_on_connect:
         caps = strategy.capabilities
         if caps.webhook_callback:
-            strategy.start_historical_sync(oauth_state.user_id, days=30)
+            # this code is going to be removed later, so leave inner imports heres
+            from app.integrations.celery.tasks import start_garmin_full_backfill
+
+            start_garmin_full_backfill.delay(str(oauth_state.user_id))
         elif caps.rest_pull:
             from app.integrations.celery.tasks import sync_vendor_data
 
@@ -173,7 +177,13 @@ def get_providers(
     """
     all_providers = settings_service.get_all_providers(db)
 
-    return [p for p in all_providers if (not enabled_only or p.is_enabled) and (not cloud_only or p.has_cloud_api)]
+    return [
+        p
+        for p in all_providers
+        if (p.provider != ProviderName.GARMIN or OFFICIAL_GARMIN_INTEGRATION_ENABLED)
+        and (not enabled_only or p.is_enabled)
+        and (not cloud_only or p.has_cloud_api)
+    ]
 
 
 @router.put("/providers/{provider}", response_model=ProviderSettingRead, tags=["Internal: Providers"])

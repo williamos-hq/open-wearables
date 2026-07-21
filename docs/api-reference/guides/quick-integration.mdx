@@ -18,7 +18,7 @@ This guide walks you through the complete flow of integrating Open Wearables wit
 
 ```
 1. Create a user in Open Wearables
-2. Connect the user to an OAuth wearable provider (for example Polar or Suunto)
+2. Connect user to a wearable provider (Garmin, Polar, Suunto)
 3. Sync data from the provider
 4. Fetch timeseries, workouts, or sleep data
 ```
@@ -64,14 +64,14 @@ Save the `id` - you'll need it for all subsequent API calls.
 Initiate OAuth to connect the user to their wearable provider.
 
 ```bash
-curl -X GET "http://localhost:8000/api/v1/oauth/polar/authorize?user_id=550e8400-e29b-41d4-a716-446655440000&redirect_uri=https://yourapp.com/connected" \
+curl -X GET "http://localhost:8000/api/v1/oauth/garmin/authorize?user_id=550e8400-e29b-41d4-a716-446655440000&redirect_uri=https://yourapp.com/connected" \
   -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
 ```
 
 **Response:**
 ```json
 {
-  "authorization_url": "https://flow.polar.com/oauth2/authorization?...",
+  "authorization_url": "https://connect.garmin.com/oauthConfirm?oauth_token=...",
   "state": "abc123..."
 }
 ```
@@ -79,7 +79,7 @@ curl -X GET "http://localhost:8000/api/v1/oauth/polar/authorize?user_id=550e8400
 Redirect the user to `authorization_url`. After they authorize, they'll be redirected back to your `redirect_uri`.
 
 <Warning>
-  OAuth provider names must be **lowercase**. Garmin OAuth is unavailable in this fork.
+  Provider names must be **lowercase**: `garmin`, `polar`, `suunto`, `apple`
 </Warning>
 
 ### Frontend Example
@@ -87,7 +87,7 @@ Redirect the user to `authorization_url`. After they authorize, they'll be redir
 ```javascript
 // Get OAuth URL
 const response = await fetch(
-  `${API_URL}/api/v1/oauth/polar/authorize?user_id=${userId}&redirect_uri=${encodeURIComponent(callbackUrl)}`,
+  `${API_URL}/api/v1/oauth/garmin/authorize?user_id=${userId}&redirect_uri=${encodeURIComponent(callbackUrl)}`,
   { headers: { 'X-Open-Wearables-API-Key': API_KEY } }
 );
 const { authorization_url } = await response.json();
@@ -101,13 +101,17 @@ window.location.href = authorization_url;
 After OAuth completes, an initial sync is triggered automatically. For subsequent syncs or to fetch historical data:
 
 ```bash
-# Polar sync
+# Garmin - with time range (recommended)
+curl -X POST "http://localhost:8000/api/v1/providers/garmin/users/550e8400-e29b-41d4-a716-446655440000/sync?summary_start_time=2025-01-01T00:00:00Z&summary_end_time=2025-01-31T00:00:00Z" \
+  -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
+
+# Suunto/Polar - no time range required
 curl -X POST "http://localhost:8000/api/v1/providers/polar/users/550e8400-e29b-41d4-a716-446655440000/sync" \
   -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
 ```
 
 <Note>
-  Garmin sync is owned by the private bridge. The public OAuth and sync routes return 404 for Garmin.
+  For Garmin, including `summary_start_time` and `summary_end_time` is recommended to specify the date range for data retrieval.
 </Note>
 
 ## Step 4: Fetch Data
@@ -160,9 +164,9 @@ async function integrateUser(email, externalId) {
   });
   const user = await userRes.json();
 
-  // 2. Get an OAuth URL for Polar
+  // 2. Get OAuth URL for Garmin
   const authRes = await fetch(
-    `${API_URL}/api/v1/oauth/polar/authorize?user_id=${user.id}&redirect_uri=${encodeURIComponent(window.location.origin + '/connected')}`,
+    `${API_URL}/api/v1/oauth/garmin/authorize?user_id=${user.id}&redirect_uri=${encodeURIComponent(window.location.origin + '/connected')}`,
     { headers: { 'X-Open-Wearables-API-Key': API_KEY } }
   );
   const { authorization_url } = await authRes.json();
@@ -194,3 +198,5 @@ async function fetchUserData(userId) {
     Available metrics, workout types, and data formats
   </Card>
 </CardGroup>
+
+

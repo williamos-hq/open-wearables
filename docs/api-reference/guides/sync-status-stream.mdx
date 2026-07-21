@@ -1,7 +1,7 @@
 ---
 title: "Live Sync Status (SSE)"
 sidebarTitle: "Live Sync Status"
-description: "Stream real-time sync lifecycle events for pulls, webhooks, SDK uploads, and file imports via Server-Sent Events."
+description: "Stream real-time sync lifecycle events for a user via Server-Sent Events. Track when pulls, webhooks, SDK uploads, Apple Health imports, and Garmin backfills start, progress, and complete."
 keywords: ["sync status", "server-sent events", "SSE", "real-time sync", "sync progress", "open wearables"]
 "og:title": "Live Sync Status (SSE) | Open Wearables"
 "og:description": "Subscribe to real-time sync lifecycle events for any user via SSE."
@@ -14,7 +14,7 @@ keywords: ["sync status", "server-sent events", "SSE", "real-time sync", "sync p
 
 ## Overview
 
-The sync status API lets you observe the lifecycle of Open Wearables pulls, webhooks, SDK uploads, and Apple Health XML imports in real time. Garmin bridge history is surfaced by WilliamOS rather than this API.
+The sync status API lets you observe the entire lifecycle of every sync that runs for a user — across pulls, webhooks, SDK uploads, Apple Health XML imports, and historical Garmin backfills — in real time.
 
 Three endpoints are exposed:
 
@@ -60,9 +60,9 @@ Every event is a JSON object emitted as the `data` field of an SSE message with 
 ```json
 {
   "event_id": "evt_01HZ...",
-  "run_id": "pull_oura_user42_1730000000",
+  "run_id": "pull_garmin_user42_1730000000",
   "user_id": "user42",
-  "provider": "oura",
+  "provider": "garmin",
   "source": "pull",
   "stage": "fetching",
   "status": "in_progress",
@@ -131,12 +131,12 @@ Browsers can consume the stream using `EventSource` (without auth headers) or `f
 : connected
 
 event: sync.status
-data: {"event_id":"evt_01HZ...","run_id":"pull_oura_user42_1730000000","provider":"oura","stage":"fetching","status":"in_progress","progress":0.42,...}
+data: {"event_id":"evt_01HZ...","run_id":"pull_garmin_user42_1730000000","provider":"garmin","stage":"fetching","status":"in_progress","progress":0.42,...}
 
 : heartbeat
 
 event: sync.status
-data: {"event_id":"evt_01HZ...","run_id":"pull_oura_user42_1730000000","provider":"oura","stage":"completed","status":"success","progress":1.0,"ended_at":"2024-10-27T10:16:45Z",...}
+data: {"event_id":"evt_01HZ...","run_id":"pull_garmin_user42_1730000000","provider":"garmin","stage":"completed","status":"success","progress":1.0,"ended_at":"2024-10-27T10:16:45Z",...}
 ```
 
 **Error responses**
@@ -198,9 +198,9 @@ Events are retained in Redis for **24 hours**. Useful when reconnecting or rende
 [
   {
     "event_id": "evt_01HZ...",
-    "run_id": "pull_oura_user42_1730000000",
+    "run_id": "pull_garmin_user42_1730000000",
     "user_id": "user42",
-    "provider": "oura",
+    "provider": "garmin",
     "source": "pull",
     "stage": "completed",
     "status": "success",
@@ -238,16 +238,16 @@ curl "https://api.openwearables.io/api/v1/users/USER_ID/sync/runs?limit=20" \
 | --------- | ---- | ------- | ----- | ----------- |
 | `limit` | `integer` | `20` | `1..50` | Maximum number of run summaries to return. |
 
-Returns the **latest** event for each unique `run_id` from the past 24 hours (one row per run), ordered newest first. Each `run_id` is stable for the entire lifetime of a single sync invocation, and only its most recent event is surfaced here.
+Returns the **latest** event for each unique `run_id` from the past 24 hours (one row per run), ordered newest first. Each `run_id` is stable for the entire lifetime of a single sync invocation — multiple progress events share the same `run_id` and only the most recent one is surfaced here. For Garmin backfill, the `run_id` is unique per execution and incorporates an execution-scoped trace identifier.
 
 **Success response** — array of run summary objects:
 
 ```json
 [
   {
-    "run_id": "pull_oura_user42_1730000000",
+    "run_id": "pull_garmin_user42_1730000000",
     "user_id": "user42",
-    "provider": "oura",
+    "provider": "garmin",
     "source": "pull",
     "stage": "completed",
     "status": "success",
@@ -259,6 +259,22 @@ Returns the **latest** event for each unique `run_id` from the past 24 hours (on
     "started_at": "2024-10-27T10:15:00Z",
     "ended_at": "2024-10-27T10:16:45Z",
     "last_update": "2024-10-27T10:16:45Z"
+  },
+  {
+    "run_id": "garmin_backfill_user42_trace-abc123",
+    "user_id": "user42",
+    "provider": "garmin",
+    "source": "backfill",
+    "stage": "fetching",
+    "status": "in_progress",
+    "message": "Fetching activities window 3 of 12",
+    "progress": 0.25,
+    "items_processed": null,
+    "items_total": null,
+    "error": null,
+    "started_at": "2024-10-27T09:00:00Z",
+    "ended_at": null,
+    "last_update": "2024-10-27T09:45:00Z"
   }
 ]
 ```

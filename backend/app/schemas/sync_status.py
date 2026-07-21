@@ -2,7 +2,7 @@
 
 A sync status event represents a state transition during a data
 synchronization run for a user. Events are produced by Celery tasks
-(pull syncs, provider backfills, SDK uploads) and webhook handlers, and
+(pull syncs, Garmin backfill, SDK uploads) and webhook handlers, and
 distributed to clients via Server-Sent Events (SSE).
 """
 
@@ -22,7 +22,7 @@ class SyncSource(StrEnum):
     PULL = "pull"  # REST polling (sync_vendor_data)
     WEBHOOK = "webhook"  # Push delivery from provider
     SDK = "sdk"  # Mobile SDK upload (Apple HealthKit, Samsung Health, ...)
-    BACKFILL = "backfill"  # Provider-managed historical backfill
+    BACKFILL = "backfill"  # Garmin webhook-based historical backfill
     XML_IMPORT = "xml_import"  # Apple Health XML upload
     LINKED_ACCOUNT = (
         "linked_account"  # Data received via fan-out from another OW profile sharing the same provider account

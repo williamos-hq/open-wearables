@@ -94,6 +94,7 @@ def create_celery() -> Celery:
         task_queues={
             "default": {},
             "sdk_sync": {},
+            "garmin_sync": {},
             "webhook_sync": {},
         },
         task_routes={
@@ -108,7 +109,7 @@ def create_celery() -> Celery:
         celery_app.conf.broker_use_ssl = ssl_options
         celery_app.conf.redis_backend_use_ssl = ssl_options
 
-    celery_app.autodiscover_tasks(["app.integrations.celery.tasks"])
+    celery_app.autodiscover_tasks(["app.integrations.celery.tasks", "app.integrations.celery.tasks.garmin"])
 
     celery_app.conf.beat_schedule = {
         "sync-all-users-periodic": {

@@ -7,6 +7,7 @@ from app.database import DbSession
 from app.schemas.enums import ProviderName
 from app.services import ApiKeyDep
 from app.services.providers.factory import ProviderFactory
+from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 
 router = APIRouter()
 factory = ProviderFactory()
@@ -55,7 +56,7 @@ def get_user_workouts(
 
     Requires valid API key and active connection for the user.
     """
-    if provider == ProviderName.GARMIN:
+    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin API reads are unavailable")
     strategy = factory.get_provider(provider.value)
 
@@ -102,7 +103,7 @@ def get_user_workout_detail(
 
     Requires valid API key and active connection for the user.
     """
-    if provider == ProviderName.GARMIN:
+    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin API reads are unavailable")
     strategy = factory.get_provider(provider.value)
 
