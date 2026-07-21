@@ -1,0 +1,24 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000013",
+  "kind": "user_metrics",
+  "source_method": "get_max_metrics",
+  "records": [
+    {
+      "provider_record_id": "profile-123:user_metrics:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "9e4d159c145502729274d53aa81b665b684147572eebe9b46b84557e29263bf5",
+      "canonical": {
+        "summaryId": "metrics-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "vo2Max": 51
+      },
+      "native": {
+        "summaryId": "metrics-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "vo2Max": 51
+      }
+    }
+  ]
+}

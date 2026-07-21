@@ -15,10 +15,11 @@ Migration status:
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.database import DbSession
 from app.services.providers.factory import ProviderFactory
+from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 from app.services.providers.templates.base_webhook_handler import BaseWebhookHandler
 
 from .oura_webhooks import router as oura_webhooks_router
@@ -30,6 +31,8 @@ _factory = ProviderFactory()
 
 
 def _get_garmin_handler() -> BaseWebhookHandler:
+    if not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
     strategy = _factory.get_provider("garmin")
     if strategy.webhooks is None:
         raise RuntimeError("Garmin webhook handler not initialised")

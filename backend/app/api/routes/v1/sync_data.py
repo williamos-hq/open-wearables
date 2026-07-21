@@ -18,6 +18,7 @@ from app.integrations.celery.tasks import (
 from app.schemas.enums import ProviderName
 from app.services import ApiKeyDep
 from app.services.providers.factory import ProviderFactory
+from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 from app.utils.exceptions import UnsupportedProviderError
 from app.utils.sync_params import build_sync_params
 
@@ -121,6 +122,9 @@ def sync_user_data(
 
     Requires valid API key and active connection for the user.
     """
+    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin sync is owned by garmin-bridge")
+
     if run_async:
         # The async worker (sync_vendor_data) always syncs all data types and
         # does not accept per-type or provider-specific flags. Reject requests
@@ -249,6 +253,8 @@ def get_garmin_backfill_status_endpoint(
     - `timed_out`: No webhook received within timeout (warning)
     - `failed`: Permanently failed after retry attempt (error)
     """
+    if not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin backfill is unavailable")
     backfill_status = get_garmin_backfill_status(str(user_id))
     return {
         "user_id": str(user_id),
@@ -270,6 +276,8 @@ def cancel_garmin_backfill(
 
     Returns 409 if no backfill is currently in progress.
     """
+    if not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin backfill is unavailable")
     backfill_status = get_garmin_backfill_status(str(user_id))
     if backfill_status["overall_status"] not in ("in_progress", "retry_in_progress"):
         raise HTTPException(
@@ -305,6 +313,8 @@ def retry_garmin_backfill_type(
     Returns:
         Dict with retry status
     """
+    if not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin backfill is unavailable")
     if type_name not in GARMIN_BACKFILL_DATA_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -367,6 +377,9 @@ def sync_historical_data(
     ``HISTORICAL_SYNC_ON_CONNECT=false``. The flag will default to
     ``false`` in a future release and is planned for removal afterwards.
     """
+    if provider == ProviderName.GARMIN and not OFFICIAL_GARMIN_INTEGRATION_ENABLED:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin sync is owned by garmin-bridge")
+
     strategy = factory.get_provider(provider.value)
 
     try:

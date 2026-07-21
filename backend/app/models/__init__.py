@@ -12,6 +12,7 @@ from .event_record_detail import EventRecordDetail
 from .invitation import Invitation
 from .personal_record import PersonalRecord
 from .provider_priority import ProviderPriority
+from .provider_native_record import ProviderNativeRecord
 from .provider_setting import ProviderSetting
 from .refresh_token import RefreshToken
 from .series_type_definition import SeriesTypeDefinition
@@ -32,6 +33,7 @@ __all__ = [
     "DeviceTypePriority",
     "Invitation",
     "ProviderPriority",
+    "ProviderNativeRecord",
     "ProviderSetting",
     "RefreshToken",
     "User",

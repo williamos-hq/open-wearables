@@ -32,7 +32,7 @@ class TestSyncDataEndpoint:
             yield mock_factory
 
     def test_sync_garmin_success(self, client: TestClient, db: Session, mock_provider_factory: MagicMock) -> None:
-        """Test successfully syncing Garmin data (synchronous mode)."""
+        """Garmin manual sync is unavailable in the import-only fork."""
         # Arrange
         user = UserFactory()
         api_key = ApiKeyFactory()
@@ -46,11 +46,8 @@ class TestSyncDataEndpoint:
         )
 
         # Assert
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        mock_provider_factory.get_provider.assert_called_once_with("garmin")
-        mock_provider_factory.get_provider.return_value.workouts.load_data.assert_called_once()
+        assert response.status_code == 404
+        mock_provider_factory.get_provider.assert_not_called()
 
     @patch("app.api.routes.v1.sync_data.sync_vendor_data")
     def test_sync_garmin_async_mode(
@@ -59,7 +56,7 @@ class TestSyncDataEndpoint:
         client: TestClient,
         db: Session,
     ) -> None:
-        """Test async sync dispatches to Celery task."""
+        """Garmin async sync does not dispatch a Celery task."""
         # Arrange
         user = UserFactory()
         api_key = ApiKeyFactory()
@@ -77,17 +74,8 @@ class TestSyncDataEndpoint:
         )
 
         # Assert
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["async"] is True
-        assert data["task_id"] == "test-task-id-123"
-
-        # Verify Celery task was dispatched
-        mock_celery_task.delay.assert_called_once()
-        call_kwargs = mock_celery_task.delay.call_args[1]
-        assert call_kwargs["providers"] == ["garmin"]
-        assert call_kwargs["user_id"] == str(user.id)
+        assert response.status_code == 404
+        mock_celery_task.delay.assert_not_called()
 
     def test_sync_garmin_unauthorized(self, client: TestClient, db: Session) -> None:
         """Test that missing API key returns 401."""

@@ -1,0 +1,22 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000015",
+  "kind": "training_status",
+  "source_method": "get_training_status",
+  "records": [
+    {
+      "provider_record_id": "profile-123:training_status:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "d39b5754e68fe2029fefe22b2a811e0cc79e54f3aa0a4f01dc3e8fb62003c6da",
+      "canonical": {
+        "calendarDate": "2026-07-19",
+        "trainingStatus": "PRODUCTIVE"
+      },
+      "native": {
+        "calendarDate": "2026-07-19",
+        "trainingStatus": "PRODUCTIVE"
+      }
+    }
+  ]
+}

@@ -29,8 +29,11 @@ class GarminStrategy(BaseProviderStrategy):
     - 24/7 data (sleep, dailies, epochs, body composition)
     """
 
-    def __init__(self):
+    def __init__(self, official_enabled: bool = True):
         super().__init__()
+        self._official_enabled = official_enabled
+        if not official_enabled:
+            return
         self.oauth = GarminOAuth(
             user_repo=self.user_repo,
             connection_repo=self.connection_repo,
@@ -65,6 +68,8 @@ class GarminStrategy(BaseProviderStrategy):
 
     @property
     def capabilities(self) -> ProviderCapabilities:
+        if not self._official_enabled:
+            return ProviderCapabilities()
         # Garmin delivers the full data payload inside every webhook (PUSH) and
         # also supports an async backfill flow (PING → callback URL fetch).
         # There is no plain REST polling path for wellness data; all data
@@ -87,6 +92,8 @@ class GarminStrategy(BaseProviderStrategy):
         The ``days`` parameter is ignored - Garmin limits historical access
         to 30 days before the user's consent date.
         """
+        if not self._official_enabled:
+            return super().start_historical_sync(user_id, days)
         task = start_garmin_full_backfill.delay(str(user_id))
         return HistoricalSyncResult(
             task_id=task.id,

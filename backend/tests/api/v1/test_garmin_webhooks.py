@@ -7,8 +7,16 @@ Celery task. Processing logic is tested in tests/tasks/test_garmin_webhook_task.
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
+
+pytestmark = pytest.mark.skipif(
+    not OFFICIAL_GARMIN_INTEGRATION_ENABLED,
+    reason="Official Garmin HTTP entry points are dormant in the WilliamOS fork",
+)
 
 PUSH_ENDPOINT = "/api/v1/providers/garmin/webhooks"
 LEGACY_PUSH_ENDPOINT = "/api/v1/garmin/webhooks/push"

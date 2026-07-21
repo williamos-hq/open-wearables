@@ -27,7 +27,7 @@ class TestOAuthAuthorizeEndpoint:
 
         # Act
         response = client.get(
-            "/api/v1/oauth/garmin/authorize",
+            "/api/v1/oauth/polar/authorize",
             params={"user_id": str(user_id)},
         )
 
@@ -48,7 +48,7 @@ class TestOAuthAuthorizeEndpoint:
 
         # Act
         response = client.get(
-            "/api/v1/oauth/garmin/authorize",
+            "/api/v1/oauth/polar/authorize",
             params={
                 "user_id": str(user_id),
                 "redirect_uri": redirect_uri,
@@ -65,7 +65,7 @@ class TestOAuthAuthorizeEndpoint:
         """Test initiating OAuth for different providers."""
         # Arrange
         user_id = uuid4()
-        providers = ["garmin", "polar", "suunto"]
+        providers = ["polar", "suunto", "whoop"]
 
         for provider in providers:
             # Act

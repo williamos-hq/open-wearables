@@ -1,0 +1,45 @@
+{
+  "contract_version": 1,
+  "batch_id": "22222222-2222-4222-8222-222222222222",
+  "kind": "sleeps",
+  "source_method": "get_sleep_data",
+  "records": [
+    {
+      "provider_record_id": "sleep-2026-07-19",
+      "source_recorded_at": "2026-07-18T22:00:00-07:00",
+      "source_updated_at": "2026-07-19T14:00:00Z",
+      "payload_sha256": "9b6f8f73619c0a03d5cff926847950051a04401173e5b0fa6ce3d32492a429d8",
+      "canonical": {
+        "summaryId": "sleep-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "durationInSeconds": 28800,
+        "deepSleepDurationInSeconds": 7200,
+        "lightSleepDurationInSeconds": 14400,
+        "remSleepInSeconds": 5400,
+        "awakeDurationInSeconds": 1800,
+        "overallSleepScore": {
+          "value": 82,
+          "qualifier": "GOOD"
+        }
+      },
+      "native": {
+        "summaryId": "sleep-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "durationInSeconds": 28800,
+        "deepSleepDurationInSeconds": 7200,
+        "lightSleepDurationInSeconds": 14400,
+        "remSleepInSeconds": 5400,
+        "awakeDurationInSeconds": 1800,
+        "overallSleepScore": {
+          "value": 82,
+          "qualifier": "GOOD"
+        },
+        "validation": "DEVICE"
+      }
+    }
+  ]
+}

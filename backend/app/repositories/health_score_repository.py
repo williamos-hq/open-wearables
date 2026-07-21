@@ -14,6 +14,34 @@ from app.utils.pagination import decode_cursor
 
 
 class HealthScoreRepository(CrudRepository[HealthScore, HealthScoreCreate, HealthScoreUpdate]):
+    def upsert(
+        self,
+        db_session: DbSession,
+        creator: HealthScoreCreate,
+        *,
+        previous_recorded_at: datetime | None = None,
+    ) -> HealthScore:
+        """Upsert a score in place so provider corrections preserve its ID."""
+        query = db_session.query(HealthScore)
+        if creator.sleep_record_id is not None:
+            existing = query.filter(HealthScore.sleep_record_id == creator.sleep_record_id).one_or_none()
+        else:
+            existing = query.filter(
+                HealthScore.user_id == creator.user_id,
+                HealthScore.provider == creator.provider,
+                HealthScore.category == creator.category,
+                HealthScore.recorded_at == (previous_recorded_at or creator.recorded_at),
+            ).one_or_none()
+
+        if existing is None:
+            existing = HealthScore(**creator.model_dump())
+            db_session.add(existing)
+        else:
+            for field, value in creator.model_dump(exclude={"id"}).items():
+                setattr(existing, field, value)
+        db_session.flush()
+        return existing
+
     def get_by_all_components(self, db_session: DbSession, components: list[str]) -> list[HealthScore]:
         """Return health scores whose components JSONB contains all specified keys (?& operator)."""
         return db_session.query(HealthScore).filter(HealthScore.components.has_all(components)).all()
@@ -94,6 +122,13 @@ class HealthScoreRepository(CrudRepository[HealthScore, HealthScoreCreate, Healt
                 HealthScore.category == category,
                 HealthScore.recorded_at == midnight,
             )
+            .delete(synchronize_session=False)
+        )
+
+    def delete_by_user_provider(self, db_session: DbSession, user_id: UUID, provider: str) -> int:
+        return (
+            db_session.query(HealthScore)
+            .filter(HealthScore.user_id == user_id, HealthScore.provider == provider)
             .delete(synchronize_session=False)
         )
 

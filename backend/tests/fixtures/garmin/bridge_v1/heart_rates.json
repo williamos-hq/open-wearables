@@ -1,0 +1,34 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-00000000000a",
+  "kind": "heart_rates",
+  "source_method": "get_heart_rates",
+  "records": [
+    {
+      "provider_record_id": "profile-123:heart_rates:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "fc2bb0fe359b026a1e9c69c1d15778e98e97aef9fc31271f04b6f90773c71bfd",
+      "canonical": {
+        "summaryId": "heart-rate-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "timeOffsetHeartRateSamples": {
+          "0": 57,
+          "300": 61
+        }
+      },
+      "native": {
+        "summaryId": "heart-rate-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "timeOffsetHeartRateSamples": {
+          "0": 57,
+          "300": 61
+        }
+      }
+    }
+  ]
+}

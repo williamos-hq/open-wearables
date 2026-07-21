@@ -116,6 +116,10 @@ Get Open Wearables up and running in minutes.
 
 ## Core Features
 
+> **WilliamOS fork:** Garmin data is imported through a private bridge. The upstream official Garmin implementation is
+> retained for easier upstream synchronization, but its OAuth, webhook, backfill, sync, and provider-read entry points
+> are disabled in this fork. See the [Garmin bridge import guide](docs/providers/garmin-bridge-import.mdx).
+
 ### Developer Portal Dashboard
 Web-based dashboard for managing your integration:
 - 📈 **General Statistics**: View number of users and data points at a glance

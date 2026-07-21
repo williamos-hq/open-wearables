@@ -10,6 +10,7 @@ Tests cover:
 """
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -17,6 +18,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.schemas.model_crud.user_management import UserCreate, UserUpdate
+from app.services.raw_payload_storage import FitStorageError
 from app.services.user_service import user_service
 from tests.factories import UserFactory
 
@@ -223,6 +225,34 @@ class TestUserServiceDelete:
 
         # Act & Assert - should not raise error
         user_service.delete(db, fake_id, raise_404=False)
+
+    def test_delete_purges_garmin_fit_objects_first(self, db: Session) -> None:
+        user = UserFactory(email="delete-fit@example.com")
+        with (
+            patch(
+                "app.services.user_service.ProviderNativeRecordRepository.get_fit_object_keys",
+                return_value=["fit-files/garmin/user/activity/hash.fit"],
+            ),
+            patch("app.services.user_service.purge_fit_prefix", return_value=1) as purge,
+        ):
+            user_service.delete(db, user.id)
+
+        purge.assert_called_once_with("garmin", str(user.id), required=True)
+        assert user_service.get(db, user.id) is None
+
+    def test_delete_keeps_user_when_fit_purge_fails(self, db: Session) -> None:
+        user = UserFactory(email="delete-fit-failure@example.com")
+        with (
+            patch(
+                "app.services.user_service.ProviderNativeRecordRepository.get_fit_object_keys",
+                return_value=["fit-files/garmin/user/activity/hash.fit"],
+            ),
+            patch("app.services.user_service.purge_fit_prefix", side_effect=FitStorageError("unavailable")),
+            pytest.raises(FitStorageError),
+        ):
+            user_service.delete(db, user.id)
+
+        assert user_service.get(db, user.id) is not None
 
 
 class TestUserServiceGetCountInRange:

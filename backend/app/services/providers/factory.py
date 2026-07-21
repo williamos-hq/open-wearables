@@ -2,6 +2,7 @@ from app.schemas.enums import ProviderName
 from app.services.providers.apple.strategy import AppleStrategy
 from app.services.providers.base_strategy import BaseProviderStrategy
 from app.services.providers.fitbit.strategy import FitbitStrategy
+from app.services.providers.garmin.availability import OFFICIAL_GARMIN_INTEGRATION_ENABLED
 from app.services.providers.garmin.strategy import GarminStrategy
 from app.services.providers.google.strategy import GoogleStrategy
 from app.services.providers.oura.strategy import OuraStrategy
@@ -25,7 +26,7 @@ class ProviderFactory:
             case ProviderName.GOOGLE.value:
                 return GoogleStrategy()
             case ProviderName.GARMIN.value:
-                return GarminStrategy()
+                return GarminStrategy(official_enabled=OFFICIAL_GARMIN_INTEGRATION_ENABLED)
             case ProviderName.SUUNTO.value:
                 return SuuntoStrategy()
             case ProviderName.POLAR.value:

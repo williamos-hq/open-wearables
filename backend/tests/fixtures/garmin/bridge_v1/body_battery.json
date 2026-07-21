@@ -1,0 +1,32 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000010",
+  "kind": "body_battery",
+  "source_method": "get_body_battery",
+  "records": [
+    {
+      "provider_record_id": "profile-123:body_battery:2026-07-19:0",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "c2cf62994cd509cc02d4b1884f66ea1e553770c4af8ab8bed282bff17c9c12a8",
+      "canonical": {
+        "summaryId": "battery-2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "timeOffsetBodyBatteryValues": {
+          "0": 82,
+          "300": 80
+        }
+      },
+      "native": {
+        "summaryId": "battery-2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "timeOffsetBodyBatteryValues": {
+          "0": 82,
+          "300": 80
+        }
+      }
+    }
+  ]
+}

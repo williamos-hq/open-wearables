@@ -1,0 +1,24 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000014",
+  "kind": "fitness_age",
+  "source_method": "get_fitnessage_data",
+  "records": [
+    {
+      "provider_record_id": "profile-123:fitness_age:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "d78f130583b0a8e09c7c342dd13400098ca6040898f7d7096c01aad14113aed9",
+      "canonical": {
+        "summaryId": "fitness-age-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "fitnessAge": 34
+      },
+      "native": {
+        "summaryId": "fitness-age-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "fitnessAge": 34
+      }
+    }
+  ]
+}

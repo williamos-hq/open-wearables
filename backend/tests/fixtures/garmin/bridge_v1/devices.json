@@ -1,0 +1,24 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-00000000001a",
+  "kind": "devices",
+  "source_method": "get_devices",
+  "records": [
+    {
+      "provider_record_id": "device-123",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "0294b2961794e2e220465a2424a895b92975e6728fd175cc7ba97c8a60b6b003",
+      "canonical": {
+        "deviceId": "device-123",
+        "productDisplayName": "Forerunner 955",
+        "softwareVersion": "22.12"
+      },
+      "native": {
+        "deviceId": "device-123",
+        "productDisplayName": "Forerunner 955",
+        "softwareVersion": "22.12"
+      }
+    }
+  ]
+}

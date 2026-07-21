@@ -57,6 +57,8 @@ class DataSourceRepository(
         software_version: str | None = None,
         source: str | None = None,
         original_source_name: str | None = None,
+        *,
+        commit: bool = True,
     ) -> DataSource:
         existing = self.get_by_identity(db_session, user_id, provider, device_model, source)
         if existing:
@@ -95,9 +97,15 @@ class DataSourceRepository(
             device_type=device_type.value if device_type != DeviceType.UNKNOWN else None,
             original_source_name=original_source_name,
         )
-        result = self.create(db_session, create_payload)
-        assert result is not None
-        return result
+        if commit:
+            result = self.create(db_session, create_payload)
+            assert result is not None
+            return result
+
+        creation = self.model(**create_payload.model_dump())
+        db_session.add(creation)
+        db_session.flush()
+        return creation
 
     def _infer_device_type(
         self,
@@ -174,6 +182,13 @@ class DataSourceRepository(
             .filter(self.model.user_id == user_id)
             .order_by(asc(self.model.provider), asc(self.model.device_model))
             .all()
+        )
+
+    def delete_by_user_provider(self, db_session: DbSession, user_id: UUID, provider: ProviderName) -> int:
+        return (
+            db_session.query(self.model)
+            .filter(self.model.user_id == user_id, self.model.provider == provider)
+            .delete(synchronize_session=False)
         )
 
     def infer_provider_from_source(self, source: str | None) -> ProviderName:

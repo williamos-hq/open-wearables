@@ -1,0 +1,47 @@
+{
+  "contract_version": 1,
+  "batch_id": "11111111-1111-4111-8111-111111111111",
+  "kind": "dailies",
+  "source_method": "get_stats",
+  "records": [
+    {
+      "provider_record_id": "profile-123:dailies:2026-07-19",
+      "source_recorded_at": "2026-07-19T00:00:00-07:00",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "181d69813bdaebe22f8e9f014e1463915c1a03a48dc638c6c9f0e4d5814fe1ff",
+      "canonical": {
+        "summaryId": "daily-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "steps": 8400,
+        "distanceInMeters": 6200,
+        "activeKilocalories": 420,
+        "restingHeartRateInBeatsPerMinute": 51,
+        "averageStressLevel": 24,
+        "stressQualifier": "LOW_STRESS",
+        "timeOffsetHeartRateSamples": {
+          "0": 57,
+          "300": 61
+        }
+      },
+      "native": {
+        "summaryId": "daily-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "steps": 8400,
+        "distanceInMeters": 6200,
+        "activeKilocalories": 420,
+        "restingHeartRateInBeatsPerMinute": 51,
+        "averageStressLevel": 24,
+        "stressQualifier": "LOW_STRESS",
+        "timeOffsetHeartRateSamples": {
+          "0": 57,
+          "300": 61
+        },
+        "unknownUsefulField": "retained"
+      }
+    }
+  ]
+}

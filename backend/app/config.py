@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     token_lifetime: int = 3600
+    garmin_bridge_ingest_secret: SecretStr | None = Field(None, min_length=32, max_length=512)
+    garmin_bridge_json_body_max_bytes: int = Field(2 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024)
+    garmin_bridge_fit_body_max_bytes: int = Field(50 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
 
     # VALIDATION SETTINGS
     min_password_length: int = 8
