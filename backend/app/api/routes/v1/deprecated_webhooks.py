@@ -6,72 +6,38 @@ These paths were registered in production before the unified
 New integrations must use:
   POST /api/v1/providers/{provider}/webhooks
 
-Migration status:
-  Garmin  — was in production; old URLs kept until Garmin Developer Portal
-            is updated to the new canonical path.
-  Oura    — was not in production; old paths kept for completeness only.
-  Strava  — was not in production; old paths kept for completeness only.
+Garmin compatibility paths intentionally return 404 in this import-only fork.
+Oura and Strava paths remain for backward compatibility.
 """
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, Request
-
-from app.database import DbSession
-from app.services.providers.factory import ProviderFactory
-from app.services.providers.templates.base_webhook_handler import BaseWebhookHandler
+from fastapi import APIRouter, HTTPException, status
 
 from .oura_webhooks import router as oura_webhooks_router
 from .strava_webhooks import router as strava_webhooks_router
 
 router = APIRouter()
 
-_factory = ProviderFactory()
-
-
-def _get_garmin_handler() -> BaseWebhookHandler:
-    strategy = _factory.get_provider("garmin")
-    if strategy.webhooks is None:
-        raise RuntimeError("Garmin webhook handler not initialised")
-    return strategy.webhooks
-
-
-async def _read_body(request: Request) -> bytes:
-    return await request.body()
-
-
 # ---------------------------------------------------------------------------
-# Garmin — canonical path changed from /garmin/webhooks/{ping,push}
-#          to /providers/garmin/webhooks in commit e458cdeb.
+# Garmin — official webhook ingestion is retired in this fork.
 # ---------------------------------------------------------------------------
 
 
 @router.post("/garmin/webhooks/ping")
-def garmin_webhook_ping_compat(
-    request: Request,
-    db: DbSession,
-    body: Annotated[bytes, Depends(_read_body)],
-) -> dict:
+def garmin_webhook_ping_compat() -> None:
     """Deprecated: POST /api/v1/garmin/webhooks/ping.
 
-    Use POST /api/v1/providers/garmin/webhooks instead.
+    Garmin data must use the authenticated internal bridge import.
     """
-    handler = _get_garmin_handler()
-    return handler.handle(request, body, db)
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
 
 
 @router.post("/garmin/webhooks/push")
-def garmin_webhook_push_compat(
-    request: Request,
-    db: DbSession,
-    body: Annotated[bytes, Depends(_read_body)],
-) -> dict:
+def garmin_webhook_push_compat() -> None:
     """Deprecated: POST /api/v1/garmin/webhooks/push.
 
-    Use POST /api/v1/providers/garmin/webhooks instead.
+    Garmin data must use the authenticated internal bridge import.
     """
-    handler = _get_garmin_handler()
-    return handler.handle(request, body, db)
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
 
 
 # Oura and Strava — re-registered at old paths for completeness.

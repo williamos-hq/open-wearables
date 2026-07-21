@@ -467,10 +467,10 @@ class TestDisconnectDeregistration:
     """Test suite for provider deregistration during disconnect."""
 
     @patch("httpx.delete")
-    def test_disconnect_calls_garmin_deregistration(
+    def test_disconnect_does_not_call_official_garmin_deregistration(
         self, mock_httpx_delete: MagicMock, client: TestClient, db: Session
     ) -> None:
-        """Test that disconnecting Garmin calls the deregistration API before revoking."""
+        """Import-only Garmin disconnects locally without provider network I/O."""
         # Arrange
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
@@ -491,11 +491,7 @@ class TestDisconnectDeregistration:
 
         # Assert
         assert response.status_code == 204
-        mock_httpx_delete.assert_called_once_with(
-            "https://apis.garmin.com/partner-gateway/rest/user/registration",
-            headers={"Authorization": "Bearer garmin_access_token"},
-            timeout=30.0,
-        )
+        mock_httpx_delete.assert_not_called()
         conn = db.query(UserConnection).filter_by(user_id=user.id, provider="garmin").one()
         assert conn.status == ConnectionStatus.REVOKED
         assert conn.access_token is None

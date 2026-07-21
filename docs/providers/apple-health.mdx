@@ -13,7 +13,7 @@ keywords: ["healthkit integration", "apple health api", "apple health data", "he
 
 ## Overview
 
-Apple Health integration uses a **push-based model** where health data is sent from the user's device to Open Wearables using our mobile SDK. This is different from cloud providers like Garmin or Polar that use webhooks.
+Apple Health integration uses a **push-based model** where health data is sent from the user's device to Open Wearables using our mobile SDK. This is different from official cloud providers like Polar that use OAuth and webhooks. Garmin uses the private bridge import in this fork.
 
 <Note>
   **Why Push-Based?** Apple HealthKit doesn't expose a cloud API. Health data lives exclusively on the user's device, so your mobile app must actively push data to your backend using our SDK.
@@ -220,4 +220,3 @@ Apple doesn't publish an official, exhaustive list of HealthKit-compatible apps.
 |---|---|
 | Fitbit | No official HealthKit integration from Google/Fitbit |
 | Samsung Galaxy Watch / Samsung Health | Ecosystem designed exclusively for Android |
-

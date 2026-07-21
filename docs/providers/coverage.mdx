@@ -295,17 +295,18 @@ Key differences and limitations to be aware of when working with each provider:
 </Accordion>
 
 <Accordion title="Garmin">
-  **Integration Method:** OAuth 2.0 + Webhooks
+  **Integration Method:** Private, authenticated bridge import
 
-  - Webhooks push data for 16 data types: activities, sleep, dailies, epochs, body composition, HRV, stress, respiration, pulse ox, blood pressure, user metrics, skin temperature, health snapshots, activity details, Move IQ, and menstrual cycle tracking
+  - A separate bridge owns Garmin Connect authentication, MFA, polling, overlap windows, cooldowns, and cursors
+  - Open Wearables accepts only checked-in health and activity methods through a bounded, versioned contract
+  - Scrubbed native observations preserve unknown fields while stable concepts are normalized
   - Full sleep processing with stages (deep, light, REM, awake), duration, efficiency score, and heart rate biometrics
   - Continuous 24/7 timeseries data: heart rate, steps, energy, HRV (RMSSD, overnight sleep window), stress levels, body battery, respiratory rate, SpO2, and more
   - Body composition from Garmin Index scale: weight, body fat %, BMI
   - Garmin-specific metrics: stress level, body battery, fitness age, skin temperature
   - 135+ workout type mappings to unified taxonomy
-  - Workout details include distance, calories, avg/max heart rate, elevation gain, and average speed
-  - Backfill orchestration for historical data retrieval (up to 5 years)
-  - Menstrual cycle tracking (MCT): cycle phase, day in cycle, cycle/period length, fertile window, and pregnancy snapshot via the `mct` webhook type
+  - Original FIT files preserve routes, samples, laps, zones, device provenance, and strength-set metadata without expanding every sample into PostgreSQL
+  - Official Garmin OAuth, webhooks, vendor reads, and backfill routes are unavailable in this fork
 </Accordion>
 
 <Accordion title="Polar">
@@ -491,4 +492,3 @@ curl -X GET "https://api.openwearables.com/api/v1/users/{user_id}/timeseries\
 &end_time=2025-01-07T23:59:59Z" \
   -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
 ```
-

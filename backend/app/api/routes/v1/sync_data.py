@@ -8,12 +8,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 
 from app.database import DbSession
 from app.integrations.celery.tasks import (
-    GARMIN_BACKFILL_DATA_TYPES,
-    get_garmin_backfill_status,
-    reset_garmin_type_status,
-    set_garmin_cancel_flag,
     sync_vendor_data,
-    trigger_garmin_backfill_for_type,
 )
 from app.schemas.enums import ProviderName
 from app.services import ApiKeyDep
@@ -83,14 +78,14 @@ def sync_user_data(
     samples: Annotated[bool, Query(description="Synchronize sample data (Polar only)")] = False,
     zones: Annotated[bool, Query(description="Synchronize zones data (Polar only)")] = False,
     route: Annotated[bool, Query(description="Synchronize route data (Polar only)")] = False,
-    # Garmin-specific parameters (backfill API - no pull token required)
+    # Deprecated Garmin-only parameters retained for client compatibility.
     summary_start_time: Annotated[
         str | None,
-        Query(description="Activity start time as Unix timestamp or ISO 8601 date (Garmin only)"),
+        Query(description="Deprecated; Garmin sync is unavailable in this fork"),
     ] = None,
     summary_end_time: Annotated[
         str | None,
-        Query(description="Activity end time as Unix timestamp or ISO 8601 date (Garmin only)"),
+        Query(description="Deprecated; Garmin sync is unavailable in this fork"),
     ] = None,
     # Async mode - dispatch to Celery worker instead of blocking
     run_async: Annotated[
@@ -112,7 +107,7 @@ def sync_user_data(
     **Provider-specific:**
     - **Suunto**: Supports workouts and 247 data with pagination
     - **Polar**: Supports workouts (exercises) only
-    - **Garmin**: Data arrives via webhooks (backfill for 30-day history)
+    - **Garmin**: Unavailable here; the private bridge owns Garmin sync
     - **Whoop**: Supports workouts and 247 data (sleep/recovery)
 
     **Execution Mode:**
@@ -121,6 +116,9 @@ def sync_user_data(
 
     Requires valid API key and active connection for the user.
     """
+    if provider == ProviderName.GARMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin sync is owned by garmin-bridge")
+
     if run_async:
         # The async worker (sync_vendor_data) always syncs all data types and
         # does not accept per-type or provider-specific flags. Reject requests
@@ -214,7 +212,7 @@ def sync_user_data(
 
 
 # =============================================================================
-# Garmin Backfill Endpoints (webhook-based, 30-day sync)
+# Retired Garmin backfill paths retained as explicit 404 responses.
 # =============================================================================
 
 
@@ -249,12 +247,7 @@ def get_garmin_backfill_status_endpoint(
     - `timed_out`: No webhook received within timeout (warning)
     - `failed`: Permanently failed after retry attempt (error)
     """
-    backfill_status = get_garmin_backfill_status(str(user_id))
-    return {
-        "user_id": str(user_id),
-        "provider": "garmin",
-        **backfill_status,
-    }
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin backfill is unavailable")
 
 
 @router.post("/garmin/users/{user_id}/backfill/cancel")
@@ -270,20 +263,7 @@ def cancel_garmin_backfill(
 
     Returns 409 if no backfill is currently in progress.
     """
-    backfill_status = get_garmin_backfill_status(str(user_id))
-    if backfill_status["overall_status"] not in ("in_progress", "retry_in_progress"):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="No backfill in progress for this user",
-        )
-
-    set_garmin_cancel_flag(str(user_id))
-
-    return {
-        "success": True,
-        "user_id": str(user_id),
-        "message": "Cancel requested. Backfill will stop after current type completes.",
-    }
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin backfill is unavailable")
 
 
 @router.post("/garmin/users/{user_id}/backfill/{type_name}/retry")
@@ -305,23 +285,7 @@ def retry_garmin_backfill_type(
     Returns:
         Dict with retry status
     """
-    if type_name not in GARMIN_BACKFILL_DATA_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid type: {type_name}. Valid types: {', '.join(GARMIN_BACKFILL_DATA_TYPES)}",
-        )
-
-    # Reset the type status to pending and trigger backfill
-    reset_garmin_type_status(str(user_id), type_name)
-    trigger_garmin_backfill_for_type.delay(str(user_id), type_name)
-
-    return {
-        "success": True,
-        "user_id": str(user_id),
-        "type": type_name,
-        "status": "triggered",
-        "message": f"Retry triggered for {type_name}. Data will arrive via webhook.",
-    }
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin backfill is unavailable")
 
 
 # =============================================================================
@@ -338,7 +302,7 @@ def sync_historical_data(
         int,
         Query(
             description="Days of historical data to fetch (default: 90, max: 365). "
-            "Ignored for providers with their own limits (e.g. Garmin: 30 days).",
+            "Garmin history is owned by the private bridge.",
             ge=1,
             le=365,
         ),
@@ -346,9 +310,9 @@ def sync_historical_data(
 ) -> dict[str, Any]:
     """Trigger a historical sync of the user's data from a connected provider.
 
-    Each provider strategy decides how to dispatch the sync (REST polling,
-    webhook backfill, etc.). The ``days`` parameter may be ignored by
-    providers that enforce their own limits.
+    Each supported provider strategy decides how to dispatch the sync. Garmin
+    is unavailable here because its private bridge owns history and cursor
+    state.
 
     **Automatic historical sync on connect (grace period)**
 
@@ -358,15 +322,15 @@ def sync_historical_data(
 
     To make migration painless, the pre-0.4.2 behaviour is kept for now
     behind a grace-period flag (``HISTORICAL_SYNC_ON_CONNECT``, default:
-    ``true``): a historical sync is auto-dispatched after a successful
-    OAuth callback (up to 90 days for pull-based providers; up to 30
-    days for Garmin, whose webhook-based backfill is capped at 30 days
-    from the user's consent date).
+    ``true``): a historical sync is auto-dispatched after a successful OAuth
+    callback for supported official providers.
 
     Once your integration calls this endpoint explicitly, set
     ``HISTORICAL_SYNC_ON_CONNECT=false``. The flag will default to
     ``false`` in a future release and is planned for removal afterwards.
     """
+    if provider == ProviderName.GARMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin sync is owned by garmin-bridge")
     strategy = factory.get_provider(provider.value)
 
     try:

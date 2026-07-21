@@ -13,6 +13,7 @@ from .developers import router as developers_router
 from .events import router as events_router
 from .health_scores import router as health_scores_router
 from .import_xml import router as import_xml_router
+from .internal_garmin_imports import router as internal_garmin_imports_router
 from .invitations import router as invitations_router
 from .meta import router as meta_router
 from .oauth import router as oauth_router
@@ -68,6 +69,7 @@ v1_router.include_router(config_router, tags=["Internal: Config"])
 v1_router.include_router(archival_router, tags=["Internal: Data Lifecycle"])
 v1_router.include_router(seed_data_router, tags=["Internal: Seed Data"])
 v1_router.include_router(priorities_router, tags=["Internal: Priorities"])
+v1_router.include_router(internal_garmin_imports_router, tags=["System: Garmin Bridge Import"])
 
 # --- System: provider webhooks ---
 v1_router.include_router(oura_webhooks_router, prefix="/oura/webhooks", tags=["System: Oura Webhooks"])

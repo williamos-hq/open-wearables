@@ -14,6 +14,12 @@ keywords: ["health api integration guide", "wearable api integration", "open wea
 
 This guide walks you through the complete integration flow with Open Wearables - creating users from your backend, handing users off to wearable providers via OAuth (the frontend redirect dance included), and fetching normalized health data back.
 
+<Note>
+Garmin is import-only in the WilliamOS fork and does not participate in the OAuth
+flow below. Its private bridge populates the same normalized read endpoints. See
+the [Garmin Bridge guide](/providers/garmin-data-pipeline).
+</Note>
+
 ## Prerequisites
 
 Before you begin, ensure you have:
@@ -350,10 +356,10 @@ async def get_providers(enabled_only: bool = True, cloud_only: bool = True) -> l
   {
     "provider": "garmin",
     "name": "Garmin",
-    "has_cloud_api": true,
+    "has_cloud_api": false,
     "is_enabled": true,
     "icon_url": "/static/provider-icons/garmin.svg",
-    "live_sync_mode": "webhook",
+    "live_sync_mode": null,
     "live_sync_configurable": false
   },
   {
@@ -417,7 +423,7 @@ curl -X PUT "http://localhost:8000/api/v1/oauth/providers/suunto" \
 
 **400 — Provider does not support live sync mode configuration:**
 
-Returned when `live_sync_mode` is included in the request body for a provider where `live_sync_configurable` is `false` (e.g. Garmin, which is webhook-only).
+Returned when `live_sync_mode` is included for a provider where `live_sync_configurable` is `false` (for example import-only Garmin).
 
 ```json
 {"detail": "Provider 'garmin' does not support live sync mode configuration"}
@@ -442,13 +448,13 @@ Returned when an invalid mode string or an explicit `null` is sent for `live_syn
 ### Get Authorization URL
 
 <Warning>
-Provider names must be **lowercase**: `garmin`, `polar`, `suunto`
+OAuth provider names must be **lowercase**. Garmin OAuth is unavailable in this fork.
 </Warning>
 
 <CodeGroup>
 
 ```bash cURL
-curl "http://localhost:8000/api/v1/oauth/garmin/authorize?user_id=176be8de-8452-4eb7-a7ea-147fec925d9d" \
+curl "http://localhost:8000/api/v1/oauth/polar/authorize?user_id=176be8de-8452-4eb7-a7ea-147fec925d9d" \
   -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
 ```
 
@@ -469,7 +475,7 @@ async def get_auth_url(provider: str, user_id: str) -> str:
 
 ```json
 {
-  "authorization_url": "https://connect.garmin.com/oauthConfirm?oauth_token=...",
+  "authorization_url": "https://flow.polar.com/oauth2/authorization?...",
   "state": "abc123..."
 }
 ```
@@ -477,7 +483,7 @@ async def get_auth_url(provider: str, user_id: str) -> str:
 ### Frontend Integration Flow
 
 <Steps>
-  <Step title="User clicks 'Connect Garmin'">
+  <Step title="User clicks 'Connect Polar'">
     Your frontend initiates the connection flow.
   </Step>
   <Step title="Your backend calls the authorize endpoint">
@@ -499,7 +505,7 @@ async def get_auth_url(provider: str, user_id: str) -> str:
 To redirect users back to your app after OAuth:
 
 ```bash
-curl "http://localhost:8000/api/v1/oauth/garmin/authorize?user_id=USER_ID&redirect_uri=https://yourapp.com/oauth/callback" \
+curl "http://localhost:8000/api/v1/oauth/polar/authorize?user_id=USER_ID&redirect_uri=https://yourapp.com/oauth/callback" \
   -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
 ```
 
@@ -519,7 +525,7 @@ curl "http://localhost:8000/api/v1/users/176be8de-8452-4eb7-a7ea-147fec925d9d/co
   {
     "id": "a1b2c3d4-...",
     "user_id": "176be8de-8452-4eb7-a7ea-147fec925d9d",
-    "provider": "garmin",
+    "provider": "polar",
     "status": "active",
     "provider_user_id": "12345678",
     "created_at": "2025-01-15T10:30:00Z",
@@ -536,7 +542,8 @@ curl "http://localhost:8000/api/v1/users/176be8de-8452-4eb7-a7ea-147fec925d9d/co
 You do **not** need to explicitly trigger a sync after OAuth completes. On the first successful provider connection, Open Wearables automatically dispatches a historical backfill:
 
 - Up to **90 days** for pull-based providers (Polar, Suunto)
-- Up to **30 days** for Garmin (webhook-based backfill capped at 30 days from the user's consent date - further back is not retrievable)
+
+Garmin history is scheduled and imported by the private bridge, not this OAuth backfill path.
 
 This behaviour is controlled by the `HISTORICAL_SYNC_ON_CONNECT` flag (default: `true`). It's a grace-period flag introduced in v0.4.3 - the default will flip to `false` in a future release and the flag will eventually be removed. Once you're ready to control historical backfill yourself, set `HISTORICAL_SYNC_ON_CONNECT=false` and call `POST /api/v1/providers/{provider}/users/{user_id}/sync/historical` explicitly. See [PR #897](https://github.com/the-momentum/open-wearables/pull/897) for background.
 
@@ -899,9 +906,9 @@ async def main():
     user = await client.get_or_create_user(local_user)
     user_id = user["id"]
 
-    # 2. Get OAuth URL for Garmin
+    # 2. Get an OAuth URL for Polar
     auth_url = await client.get_auth_url(
-        provider="garmin",
+        provider="polar",
         user_id=user_id,
         redirect_uri="https://myapp.com/callback",
     )
@@ -910,12 +917,12 @@ async def main():
     # 3. After OAuth callback, confirm the connection is active.
     # Historical backfill is dispatched automatically - no explicit sync call needed.
     connections = await client.get_connections(user_id)
-    garmin_connected = any(
-        c["provider"] == "garmin" and c["status"] == "active"
+    polar_connected = any(
+        c["provider"] == "polar" and c["status"] == "active"
         for c in connections
     )
 
-    if garmin_connected:
+    if polar_connected:
         # 4. Fetch whatever you need.
         workouts = await client.get_workouts(user_id, "2025-01-01", "2025-01-31")
         activity = await client.get_activity_summary(user_id, "2025-01-01", "2025-01-31")
@@ -967,7 +974,7 @@ async def main():
   </Accordion>
   
   <Accordion title="Data endpoints return empty results right after OAuth">
-    Historical backfill is dispatched asynchronously on connect and can take anywhere from seconds to several minutes depending on the provider and the amount of history. Poll `GET /api/v1/users/{user_id}/connections` - `last_synced_at` flips from `null` to a timestamp once the first sync finishes. For Garmin's async export, full history can take hours.
+    OAuth-provider backfill is dispatched asynchronously on connect and can take anywhere from seconds to several minutes depending on the provider and the amount of history. Poll `GET /api/v1/users/{user_id}/connections` - `last_synced_at` flips from `null` to a timestamp once the first sync finishes. Garmin progress is exposed by WilliamOS through the private bridge.
 
     If `HISTORICAL_SYNC_ON_CONNECT=false` in your instance, no backfill runs automatically - call `POST /api/v1/providers/{provider}/users/{user_id}/sync/historical` yourself.
   </Accordion>
@@ -986,7 +993,7 @@ async def main():
     Pass the `redirect_uri` parameter when getting the authorization URL:
     
     ```bash
-    /api/v1/oauth/garmin/authorize?user_id=...&redirect_uri=https://myapp.com/callback
+    /api/v1/oauth/polar/authorize?user_id=...&redirect_uri=https://myapp.com/callback
     ```
   </Accordion>
 </AccordionGroup>
@@ -1009,4 +1016,3 @@ async def main():
     View source code and contribute.
   </Card>
 </CardGroup>
-

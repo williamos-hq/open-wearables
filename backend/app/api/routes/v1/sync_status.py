@@ -11,10 +11,10 @@ All three are tagged ``External: Sync Status`` and protected by
 ``X-Open-Wearables-API-Key`` header — no separate /dashboard variants
 are needed.
 
-The SSE feed covers events from every sync source: pull syncs
-(``sync_vendor_data``), Garmin webhook live + 30-day backfill, mobile
-SDK uploads (Apple HealthKit, Samsung Health, Google), and Apple XML
-import.
+The SSE feed covers Open Wearables sync sources: pull syncs
+(``sync_vendor_data``), provider webhooks, mobile SDK uploads (Apple
+HealthKit, Samsung Health, Google), and Apple XML import. Garmin bridge-run
+history is owned and exposed by WilliamOS rather than this endpoint.
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ def stream_user_sync_status(
     Covers events from:
 
     - REST pull syncs (e.g. Whoop, Oura, Polar, Suunto)
-    - Garmin webhook live + 30-day backfill
+    - Provider webhook processing
     - Mobile SDK uploads (Apple HealthKit, Samsung Health, Google)
     - Apple Health XML imports
 

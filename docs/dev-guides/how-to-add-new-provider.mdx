@@ -34,13 +34,13 @@ Each provider declares its data delivery modes via `ProviderCapabilities`:
 | `rest_pull` | Usually historical REST API | Oura, Whoop, Strava, Suunto |
 | `client_sdk` | Data delivered via mobile SDK client | Apple, Samsung, Google |
 | `file_import` | File-based data import | Apple Health |
-| `webhook_callback` | Provider-initiates async export delivered to our webhook | Garmin backfill |
-| `webhook_stream` | Provider pushes full data payload in every webhook | Garmin, Suunto |
+| `webhook_callback` | Provider-initiates async export delivered to our webhook | Export-style integrations |
+| `webhook_stream` | Provider pushes full data payload in every webhook | Suunto |
 | `webhook_ping` | Provider sends a lightweight notification; actual data must be fetched via REST | Oura, Strava, Fitbit, Polar |
 | `webhook_registration_api` | Provider exposes an API to programmatically register webhook subscriptions. When `False`, subscriptions must be configured manually in the provider's developer portal. | Oura |
 
 <Note>
-`webhook_stream` and `webhook_ping` are mutually exclusive. Use `webhook_stream` when the provider embeds the complete record in the webhook body (Garmin, Suunto). Use `webhook_ping` when the webhook is only a trigger and you must call the REST API to retrieve the actual data (Oura, Strava, Fitbit, Polar).
+`webhook_stream` and `webhook_ping` are mutually exclusive. Use `webhook_stream` when the provider embeds the complete record in the webhook body (Suunto). Use `webhook_ping` when the webhook is only a trigger and you must call the REST API to retrieve the actual data (Oura, Strava, Fitbit, Polar). Garmin is import-only in this fork and uses neither public webhook mode.
 </Note>
 
 <img src="/images/providers/custom-providers-architecture.png" alt="Custom providers architecture showing Strategy, OAuth, Workouts, 247 Data, and Webhook Handler components" />
@@ -647,7 +647,7 @@ First decide how your provider delivers webhook data:
 <CardGroup cols={2}>
   <Card title="Full payload (push)" icon="download">
     Provider sends the complete data in the webhook body. `dispatch()` saves records directly.
-    **Example: Garmin**
+    **Example: Suunto**
   </Card>
   <Card title="Notify-only" icon="bell">
     Provider sends a lightweight notification with user ID + event type. You must fetch actual data via REST inside `dispatch()`.
@@ -658,7 +658,7 @@ First decide how your provider delivers webhook data:
 Reflect this in `capabilities` inside your strategy:
 
 ```python
-# Full-payload stream (Garmin/Suunto-style) — historical pull + live webhook stream
+# Full-payload stream (Suunto-style) — historical pull + live webhook stream
 return ProviderCapabilities(rest_pull=True, webhook_stream=True)
 
 # Notify-only ping (Oura/Strava-style) — REST pull + webhook triggers refetch

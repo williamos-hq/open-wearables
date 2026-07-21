@@ -36,14 +36,14 @@ def get_user_workouts(
     samples: Annotated[bool, Query(description="Return sample data (Polar only)")] = False,
     zones: Annotated[bool, Query(description="Return zones data (Polar only)")] = False,
     route: Annotated[bool, Query(description="Return route data (Polar only)")] = False,
-    # Garmin-specific parameters (backfill API - no pull token required)
+    # Deprecated Garmin-only parameters retained for client compatibility.
     summary_start_time: Annotated[
         str | None,
-        Query(description="Activity start time as Unix timestamp or ISO 8601 date (Garmin only)"),
+        Query(description="Deprecated; Garmin provider reads are unavailable"),
     ] = None,
     summary_end_time: Annotated[
         str | None,
-        Query(description="Activity end time as Unix timestamp or ISO 8601 date (Garmin only)"),
+        Query(description="Deprecated; Garmin provider reads are unavailable"),
     ] = None,
 ) -> dict | list[dict]:
     """
@@ -51,10 +51,12 @@ def get_user_workouts(
 
     - **Suunto**: Returns workouts with pagination support
     - **Polar**: Returns exercises (Polar's term for workouts)
-    - **Garmin**: Returns activities from Health API
+    - **Garmin**: Unavailable here; use normalized Open Wearables workout reads
 
     Requires valid API key and active connection for the user.
     """
+    if provider == ProviderName.GARMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin API reads are unavailable")
     strategy = factory.get_provider(provider.value)
 
     if not strategy.workouts:
@@ -96,10 +98,12 @@ def get_user_workout_detail(
 
     - **Suunto**: Returns detailed workout data
     - **Polar**: Returns detailed exercise data
-    - **Garmin**: Returns detailed activity data
+    - **Garmin**: Unavailable here; use normalized Open Wearables workout reads
 
     Requires valid API key and active connection for the user.
     """
+    if provider == ProviderName.GARMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin API reads are unavailable")
     strategy = factory.get_provider(provider.value)
 
     if not strategy.workouts:

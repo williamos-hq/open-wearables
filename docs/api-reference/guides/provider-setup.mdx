@@ -22,27 +22,14 @@ Each wearable provider has different requirements and parameters for syncing dat
 
 ## Garmin
 
-Garmin uses a **webhook-only** delivery model — there is no REST polling path. It implements two capability flags:
+Garmin is **import-only** in this fork. The private `garmin-bridge` owns account
+login, MFA, polling, cursors, and request budgets. Open Wearables accepts only
+the dedicated service-to-service ingest contract and serves the resulting data
+through its normal summaries, timeseries, workout, sleep, and score endpoints.
 
-- **`webhook_stream`** — Garmin pushes the complete data payload to your webhook endpoint in real time as the user syncs their device.
-- **`webhook_callback`** — For historical backfill, a backfill task is dispatched asynchronously; Garmin delivers the results to your webhook callback URL.
-
-Because Garmin has no `rest_pull` capability, `live_sync_configurable` is `false` and `live_sync_mode` is fixed at `"webhook"`.
-
-### Historical backfill
-
-To trigger a historical backfill (up to 30 days), call the dedicated endpoint:
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/providers/garmin/users/{user_id}/sync/historical" \
-  -H "X-Open-Wearables-API-Key: YOUR_API_KEY"
-```
-
-The server enqueues the backfill task and Garmin delivers the data asynchronously to your registered webhook endpoint — no time-range parameters are accepted or required.
-
-<Warning>
-  Do **not** use the generic `/sync` REST endpoint for Garmin — Garmin has no server-side REST pull path. All data arrives via webhook push.
-</Warning>
+Official Garmin OAuth, webhook, sync, and backfill endpoints return `404`. See
+the [Garmin Bridge guide](/providers/garmin-data-pipeline) for configuration,
+contract examples, FIT retention, and deletion behavior.
 
 ---
 

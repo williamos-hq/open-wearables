@@ -263,6 +263,27 @@ class DataPointSeriesRepository(
             source=creator.source,
         )
 
+    def delete_by_user_provider_external_prefix(
+        self,
+        db_session: DbSession,
+        user_id: UUID,
+        provider: ProviderName,
+        external_prefix: str,
+    ) -> int:
+        """Delete one provider record's prior time-series projection."""
+        source_ids = db_session.query(DataSource.id).filter(
+            DataSource.user_id == user_id,
+            DataSource.provider == provider,
+        )
+        return (
+            db_session.query(self.model)
+            .filter(
+                self.model.data_source_id.in_(source_ids.scalar_subquery()),
+                self.model.external_id.startswith(f"{external_prefix}:"),
+            )
+            .delete(synchronize_session=False)
+        )
+
     def get_samples(
         self,
         db_session: DbSession,

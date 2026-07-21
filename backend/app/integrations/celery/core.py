@@ -94,7 +94,6 @@ def create_celery() -> Celery:
         task_queues={
             "default": {},
             "sdk_sync": {},
-            "garmin_sync": {},
             "webhook_sync": {},
         },
         task_routes={
@@ -109,7 +108,7 @@ def create_celery() -> Celery:
         celery_app.conf.broker_use_ssl = ssl_options
         celery_app.conf.redis_backend_use_ssl = ssl_options
 
-    celery_app.autodiscover_tasks(["app.integrations.celery.tasks", "app.integrations.celery.tasks.garmin"])
+    celery_app.autodiscover_tasks(["app.integrations.celery.tasks"])
 
     celery_app.conf.beat_schedule = {
         "sync-all-users-periodic": {
@@ -121,12 +120,6 @@ def create_celery() -> Celery:
         "finalize-stale-sleeps-periodic": {
             "task": "app.integrations.celery.tasks.finalize_stale_sleep_task.finalize_stale_sleeps",
             "schedule": float(settings.sleep_sync_interval_seconds),
-            "args": (),
-            "kwargs": {},
-        },
-        "gc-stuck-garmin-backfills": {
-            "task": "app.integrations.celery.tasks.garmin.gc_task.gc_stuck_backfills",
-            "schedule": 180.0,  # Every 3 minutes
             "args": (),
             "kwargs": {},
         },

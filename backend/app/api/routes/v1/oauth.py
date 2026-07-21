@@ -26,6 +26,8 @@ settings_service = ProviderSettingsService()
 
 def get_oauth_strategy(provider: ProviderName) -> BaseProviderStrategy:
     """Helper to get provider strategy and ensure it supports OAuth."""
+    if provider == ProviderName.GARMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin OAuth is unavailable")
     strategy = factory.get_provider(provider.value)
 
     if not strategy.oauth:
@@ -74,6 +76,9 @@ def oauth_callback(
 
     Provider redirects here after user authorizes. Exchanges code for tokens.
     """
+    if provider == ProviderName.GARMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin OAuth is unavailable")
+
     if error:
         return RedirectResponse(
             url=f"/api/v1/oauth/error?message={error}:+{error_description or 'Unknown+error'}",
@@ -101,10 +106,7 @@ def oauth_callback(
     if settings.historical_sync_on_connect:
         caps = strategy.capabilities
         if caps.webhook_callback:
-            # this code is going to be removed later, so leave inner imports heres
-            from app.integrations.celery.tasks import start_garmin_full_backfill
-
-            start_garmin_full_backfill.delay(str(oauth_state.user_id))
+            strategy.start_historical_sync(oauth_state.user_id, days=30)
         elif caps.rest_pull:
             from app.integrations.celery.tasks import sync_vendor_data
 

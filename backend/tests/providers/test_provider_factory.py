@@ -132,22 +132,22 @@ class TestProviderFactory:
         assert strategy.connection_repo is not None
         assert strategy.workout_repo is not None
 
-    def test_provider_garmin_has_oauth(self, factory: ProviderFactory) -> None:
-        """Should initialize OAuth component for Garmin."""
+    def test_provider_garmin_has_no_official_oauth(self, factory: ProviderFactory) -> None:
+        """Import-only Garmin does not expose an OAuth component."""
         # Act
         strategy = factory.get_provider("garmin")
 
         # Assert
-        assert strategy.oauth is not None
-        assert strategy.has_cloud_api is True
+        assert strategy.oauth is None
+        assert strategy.has_cloud_api is False
 
-    def test_provider_garmin_has_workouts(self, factory: ProviderFactory) -> None:
-        """Should initialize workouts component for Garmin."""
+    def test_provider_garmin_has_no_official_workouts(self, factory: ProviderFactory) -> None:
+        """Import-only Garmin does not expose an official workout client."""
         # Act
         strategy = factory.get_provider("garmin")
 
         # Assert
-        assert strategy.workouts is not None
+        assert strategy.workouts is None
 
     def test_provider_apple_no_oauth(self, factory: ProviderFactory) -> None:
         """Should not have OAuth component for Apple."""

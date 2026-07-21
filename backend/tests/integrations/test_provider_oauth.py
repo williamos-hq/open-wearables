@@ -16,14 +16,14 @@ from tests.utils import api_key_headers, developer_auth_headers
 
 
 class TestGarminOAuth:
-    """Tests for Garmin OAuth flow."""
+    """Tests that official Garmin OAuth is unavailable in this fork."""
 
     def test_garmin_authorize_redirect(
         self,
         client: TestClient,
         db: Session,
     ) -> None:
-        """Test Garmin OAuth authorization initiates redirect."""
+        """Garmin OAuth authorization is disabled."""
         # Arrange
         user = UserFactory()
         developer = DeveloperFactory()
@@ -36,8 +36,7 @@ class TestGarminOAuth:
             follow_redirects=False,
         )
 
-        # Assert - Should redirect or return auth URL
-        assert response.status_code in [200, 302, 307, 422]
+        assert response.status_code == 404
 
     @patch("httpx.AsyncClient")
     def test_garmin_callback_success(
@@ -46,7 +45,7 @@ class TestGarminOAuth:
         client: TestClient,
         db: Session,
     ) -> None:
-        """Test Garmin OAuth callback handles tokens."""
+        """Garmin OAuth callback is disabled."""
         # Arrange
         user = UserFactory()
         developer = DeveloperFactory()
@@ -80,15 +79,14 @@ class TestGarminOAuth:
             follow_redirects=False,
         )
 
-        # Assert - May redirect to success page or return JSON
-        assert response.status_code in [200, 302, 303, 307, 400, 422]
+        assert response.status_code == 404
 
     def test_garmin_callback_error(
         self,
         client: TestClient,
         db: Session,
     ) -> None:
-        """Test Garmin OAuth callback handles errors."""
+        """Garmin OAuth callback rejects provider errors too."""
         # Arrange
         user = UserFactory()
         developer = DeveloperFactory()
@@ -107,7 +105,7 @@ class TestGarminOAuth:
         )
 
         # Assert
-        assert response.status_code in [302, 303, 307, 400, 422]
+        assert response.status_code == 404
 
 
 class TestPolarOAuth:

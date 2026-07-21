@@ -16,10 +16,9 @@ The per-provider webhook handlers (to be implemented under
 2. Parsing and validating the payload schema.
 3. Dispatching to the appropriate service method.
 
-Existing provider-specific routes (``/garmin/webhooks``, ``/oura/webhooks``,
-``/strava/webhooks``) are intentionally kept in place while individual handlers
-are migrated.  Once a provider's ``BaseWebhookHandler`` is implemented and wired
-into its strategy, traffic can be cut over to this router.
+Existing Oura and Strava provider-specific routes remain during migration.
+Garmin webhook entry points are deliberately unavailable in this import-only
+fork; Garmin observations arrive only through the private bridge contract.
 """
 
 from logging import getLogger
@@ -47,6 +46,8 @@ _factory = ProviderFactory()
 
 def _get_strategy(provider: str) -> BaseProviderStrategy:
     """Resolve and return the provider strategy, raising 404 for unknown providers."""
+    if provider == "garmin":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
     try:
         return _factory.get_provider(provider)
     except ValueError:
@@ -62,6 +63,8 @@ def _get_webhook_handler(provider: str) -> BaseWebhookHandler:
     Raises ``404`` if the provider is unknown and ``501`` if the provider
     exists but has not yet implemented a ``BaseWebhookHandler``.
     """
+    if provider == "garmin":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
     try:
         strategy = _factory.get_provider(provider)
     except ValueError:

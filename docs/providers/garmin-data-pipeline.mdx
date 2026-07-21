@@ -1,563 +1,294 @@
 ---
-title: "Garmin Data Pipeline"
-sidebarTitle: "Data Pipeline"
-description: "Garmin delivers data only via webhooks. This guide covers ingestion, backfill orchestration, and retry logic. Celery workers with Redis-backed state."
-keywords: ["garmin data pipeline", "garmin webhook ingestion", "garmin api architecture", "garmin celery workers"]
-"og:title": "Garmin Data Pipeline | Open Wearables"
-"og:description": "Garmin webhook ingestion, backfill orchestration, and retry logic. Celery workers with Redis-backed state management."
+title: "Garmin Bridge Import"
+sidebarTitle: "Garmin Bridge"
+description: "Import scrubbed Garmin Connect observations and original FIT activity files through the private, versioned bridge contract."
+keywords: ["garmin bridge", "garmin connect import", "garmin fit", "open wearables ingest contract"]
+"og:title": "Garmin Bridge Import | Open Wearables"
+"og:description": "Private Garmin Connect ingest contract, native-record retention, normalization, FIT storage, and deletion."
 "og:url": "https://docs.openwearables.io/providers/garmin-data-pipeline"
 "og:type": "article"
-"twitter:title": "Garmin Data Pipeline | Open Wearables"
-"twitter:description": "Garmin webhook ingestion, backfill orchestration, and retry logic. Celery workers with Redis-backed state management."
-"twitter:card": "summary_large_image"
 ---
 
-## Architecture Overview
+## Scope and responsibilities
+
+This fork treats Garmin as an **import-only provider**. A separately deployed
+`garmin-bridge` owns Garmin Connect login, MFA, encrypted session tokens,
+polling, cursor state, retries, and rate limiting. Open Wearables never receives
+Garmin credentials and never calls Garmin Connect.
+
+Open Wearables owns:
+
+- the private, versioned ingest contract;
+- validation, deterministic secret scrubbing, and content hashing;
+- scrubbed native observations and normalized health records;
+- original FIT activity objects and their manifests;
+- provider-data deletion and derived-score recomputation.
+
+Garmin OAuth, webhooks, historical backfill, manual sync, and vendor-workout
+routes are unavailable in this fork. Other providers continue to use their
+existing integrations.
 
 ```mermaid
-graph TB
-    Frontend["Frontend<br/>(React/TS)"] <-->|"OAuth 2.0 + PKCE"| Garmin["Garmin API"]
-    Frontend -->|"polling"| FastAPI["FastAPI Routes"]
-    Garmin -->|"webhooks"| Celery["Celery Workers"]
-    FastAPI -->|"backfill trigger"| Celery
-    Celery -->|"status / cancel"| FastAPI
-    FastAPI --> PostgreSQL["PostgreSQL<br/>(data)"]
-    Celery --> Redis["Redis<br/>(state / locks)"]
+flowchart LR
+    Account["WilliamOS account"] --> Bridge["garmin-bridge"]
+    Bridge -->|"dedicated bearer secret + contract v1"| Import["Open Wearables internal import"]
+    Import --> Native[("provider_native_record")]
+    Import --> Normalized[("normalized health tables")]
+    Bridge -->|"original FIT bytes"| FitImport["FIT import"]
+    FitImport --> Objects[("private S3-compatible storage")]
+    FitImport --> Native
 ```
 
-Garmin data arrives exclusively via webhooks. There are no REST pull endpoints (forbidden by Garmin's API terms). The system requests historical data via backfill endpoints, then Garmin delivers the data asynchronously through webhook callbacks.
+## Authentication and network controls
 
-## Data Flow
+Set a different high-entropy secret in the bridge and Open Wearables:
 
-### Real-time (ongoing after connection)
-
-```mermaid
-graph LR
-    A["Garmin device syncs"] --> B["Garmin cloud"]
-    B -->|"Webhook POST"| C["/ping handler"]
-    C --> D["Fetch callback URLs"]
-    D --> E["Parse & batch-insert"]
-    E --> F[("PostgreSQL")]
+```dotenv config/.env
+GARMIN_BRIDGE_INGEST_SECRET=replace-with-at-least-32-random-bytes
+GARMIN_BRIDGE_JSON_BODY_MAX_BYTES=2097152
+GARMIN_BRIDGE_FIT_BODY_MAX_BYTES=52428800
 ```
 
-### Historical backfill (on first connection)
+Generate a secret without committing it:
 
-```mermaid
-graph TD
-    A["OAuth callback"] --> B["start_full_backfill"]
-    B --> C{"Single 30-day window"}
-    C --> D{"For each of 5 data types<br/>(sequential)"}
-    D --> E["POST backfill request<br/>to Garmin"]
-    E --> F{"Webhook arrives<br/>within 5 min?"}
-    F -->|"Yes"| G["mark_type_success"]
-    F -->|"No"| H["Timeout → skip"]
-    G --> D
-    H --> D
-    D -->|"All types done"| I["Advance to<br/>next window"]
-    I --> C
-    C -->|"All windows done"| J["Retry timed-out types"]
-    J --> K["Release lock,<br/>mark complete"]
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-## OAuth Connection
+Every request must use `Authorization: Bearer <secret>`. The secret is compared
+in constant time and is independent of developer API keys. If it is unset, the
+routes fail closed with `503`. Keep the routes on a private service network and,
+where available, allow inbound traffic only from the bridge workload.
 
-<Info>
-**File:** `backend/app/api/routes/v1/oauth.py`
-</Info>
+The application does not apply a separate requests-per-minute quota to these
+internal routes. The bridge must serialize its Garmin polling, send at most 50
+records per JSON batch, retry with bounded exponential backoff, and advance a
+cursor only after a successful acknowledgement. A reverse proxy may enforce an
+additional service-level request limit.
 
-Garmin uses OAuth 2.0 with PKCE. The flow:
+## JSON import contract
 
-1. Frontend redirects user to `GET /api/v1/oauth/{provider}/authorize`
-2. User grants permissions on Garmin's site
-3. Garmin redirects back to `GET /api/v1/oauth/{provider}/callback`
-4. Callback handler:
-   - Creates/updates `UserConnection` in the database
-   - Dispatches `sync_vendor_data.delay()` for initial sync
-   - For Garmin specifically: dispatches `start_garmin_full_backfill.delay(user_id)`
+`POST /api/v1/internal/users/{open_wearables_user_id}/imports/garmin`
 
-The backfill starts automatically on connection. There is no manual "Sync Now" button for Garmin in the frontend.
+The authenticated path fixes both the user and provider. Payload fields named
+`user_id` or `provider`, unknown fields, unknown kind/method pairs, duplicate
+record IDs, naive timestamps, non-finite JSON numbers, and unsupported contract
+versions are rejected. Each record is limited to 256 KiB after scrubbing and
+canonical serialization.
 
-<Warning>
-If the user didn't grant the `HISTORICAL_DATA_EXPORT` permission, all backfill requests will return 403. All 5 types fail together in this case.
-</Warning>
+```bash
+curl --fail-with-body \
+  --request POST \
+  --url "http://open-wearables:8000/api/v1/internal/users/176be8de-8452-4eb7-a7ea-147fec925d9d/imports/garmin" \
+  --header "Authorization: Bearer ${GARMIN_BRIDGE_INGEST_SECRET:?missing secret}" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "contract_version": 1,
+    "batch_id": "90f4f0e7-c0a4-4de5-8dfc-f0414660764f",
+    "kind": "dailies",
+    "source_method": "get_stats",
+    "records": [
+      {
+        "provider_record_id": "2026-07-19",
+        "source_recorded_at": "2026-07-19T07:00:00Z",
+        "source_updated_at": "2026-07-20T02:14:05Z",
+        "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "canonical": {
+          "summaryId": "daily-2026-07-19",
+          "calendarDate": "2026-07-19",
+          "startTimeInSeconds": 1784444400,
+          "startTimeOffsetInSeconds": -25200,
+          "steps": 8421,
+          "distanceInMeters": 6385,
+          "activeKilocalories": 437
+        },
+        "native": {
+          "wellnessStartTimeGmt": "2026-07-19T07:00:00Z"
+        }
+      }
+    ]
+  }'
+```
 
-## Webhook Handlers (PING/PUSH)
-
-<Info>
-**File:** `backend/app/api/routes/v1/garmin_webhooks.py`
-</Info>
-
-Garmin sends two types of webhooks:
-
-### PING (callback-based)
-
-`POST /api/v1/garmin_webhooks/ping`
-
-Garmin sends a notification with callback URLs. The handler fetches the actual data from those URLs.
+Successful response:
 
 ```json
 {
-  "sleeps": [{"userId": "garmin-uid", "callbackURL": "https://..."}],
-  "dailies": ["..."],
-  "activities": ["..."]
+  "batch_id": "90f4f0e7-c0a4-4de5-8dfc-f0414660764f",
+  "committed": 1,
+  "inserted": 1,
+  "updated": 0,
+  "unchanged": 0,
+  "rejected": 0,
+  "normalization_errors": 0,
+  "errors": []
 }
 ```
 
-**Processing flow per notification:**
-
-1. Extract callback URL from notification
-2. Fetch data via `httpx.get(callback_url)` with OAuth token
-3. Find internal user via Garmin user ID mapping
-4. Batch-process via `Garmin247Data.process_items_batch()`
-5. Commit to PostgreSQL
-6. If a backfill is active: call `mark_type_success(user_id, data_type)`
-7. On new success transition: call `trigger_next_pending_type.delay()`
-
-### PUSH (direct payload)
-
-For data types where Garmin sends the payload directly in the webhook body rather than a callback URL.
-
-### Backfill chain integration
-
-The webhook handlers are the bridge between Garmin's async data delivery and the backfill state machine. When a webhook arrives for a type that was requested via backfill:
-
-- `mark_type_success()` transitions the type from `triggered` to `success`
-- Only on a new transition (returns `True`), `trigger_next_pending_type` is enqueued
-- This chains the sequential processing: request type -> await webhook -> next type
-
-All 16 data types are handled by the webhook regardless of whether they're included in backfill orchestration. The 5-type restriction only applies to which types are actively requested during backfill.
-
-## Backfill Orchestration
-
-### Configuration
-
-<Info>
-**File:** `backend/app/services/providers/garmin/backfill_config.py`
-</Info>
-
-| Constant | Value | Purpose |
-|----------|-------|---------|
-| `BACKFILL_DATA_TYPES` | 5 types | Types included in backfill (sleeps, dailies, activities, activityDetails, hrv) |
-| `ALL_DATA_TYPES` | 16 types | All types handled by webhooks |
-| `BACKFILL_WINDOW_COUNT` | 1 | Single 30-day window (Garmin's max allowed range) |
-| `BACKFILL_CHUNK_DAYS` | 30 | Days per window (Garmin API limit) |
-| `MAX_BACKFILL_DAYS` | 30 | Total lookback (Garmin only allows 30 days before the user connected to the developer app) |
-| `TRIGGERED_TIMEOUT_SECONDS` | 300 | 5-min timeout per type before skipping |
-| `DELAY_BETWEEN_TYPES` | 2 | Seconds between type requests (rate limit budget) |
-| `BACKFILL_LOCK_TTL` | 5100 | ~1.4-hour lock TTL (safety net) |
-| `REDIS_TTL` | 604800 | 7-day TTL for all tracking keys |
-| `GC_STUCK_THRESHOLD_SECONDS` | 600 | 10 minutes of no activity = stuck |
-| `GC_SCAN_INTERVAL_SECONDS` | 180 | GC runs every 3 minutes |
-| `GC_MAX_ATTEMPTS` | 3 | Max GC cycles before permanently failed |
-
-<Note>
-**Rate limiting:** Garmin allows 100 requests/minute. Backfill reserves 30% of the budget (30 req/min), resulting in a 2-second delay between type requests.
-</Note>
-
-### State Machine
-
-<Info>
-**File:** `backend/app/integrations/celery/tasks/garmin/backfill_task.py`
-</Info>
-
-The backfill operates as a Celery task chain with three phases:
-
-#### Phase 1: Sequential window processing
-
-```mermaid
-graph TD
-    A["start_full_backfill(user_id)"] --> B{"permanently_failed?"}
-    B -->|"Yes"| B1["Reject"]
-    B -->|"No"| C["Acquire Redis lock<br/>(SETNX + ~1.4h TTL)"]
-    C --> D{"Existing window<br/>state in Redis?"}
-    D -->|"window > 0"| E["Resume from<br/>current position"]
-    D -->|"Fresh"| F["init_window_state<br/>(total_windows=1)"]
-    E --> G["trigger_backfill_for_type"]
-    F --> G
-
-    G --> G1["Compute date range"]
-    G1 --> G2["POST to Garmin<br/>backfill endpoint"]
-    G2 --> G3["Mark type 'triggered'<br/>in Redis"]
-    G3 --> G4["Schedule timeout check<br/>(countdown=300s)"]
-
-    G4 --> H{"Webhook arrives<br/>within 5 min?"}
-
-    H -->|"Yes"| I["mark_type_success"]
-    I --> J["trigger_next_pending_type"]
-    J --> K{"More pending<br/>types?"}
-    K -->|"Yes"| G
-    K -->|"No"| L["persist_window_results"]
-
-    H -->|"No (timeout)"| M["mark_type_timed_out"]
-    M --> M1["record_timed_out_entry"]
-    M1 --> J
-
-    L --> L1["advance_window"]
-    L1 --> N{"More windows?"}
-    N -->|"Yes"| G
-    N -->|"No"| O["Proceed to<br/>retry phase"]
-```
-
-#### Phase 2: Retry (after window completes)
-
-When all windows are exhausted, timed-out types get one retry:
-
-```mermaid
-graph TD
-    A["No more windows"] --> B["get_retry_targets<br/>(deduplicate per type)"]
-    B --> C["enter_retry_phase<br/>Set flag + store targets"]
-    C --> D["setup_retry_window<br/>(window_idx)"]
-    D --> E["trigger_backfill_for_type<br/>(retry window date range)"]
-    E --> F{"Webhook arrives?"}
-    F -->|"Yes"| G["update_window_cell<br/>(done)"]
-    F -->|"Timeout again"| H["Escalate to 'failed'<br/>update_window_cell(failed)"]
-    G --> I{"More retry<br/>targets?"}
-    H --> I
-    I -->|"Yes"| D
-    I -->|"No"| J["clear_retry_state"]
-    J --> K["release_backfill_lock"]
-    K --> L["complete_backfill"]
-```
-
-<Note>
-A second timeout during retry escalates the type from `timed_out` to `failed` (permanent). This is distinct from `timed_out` which indicates the type may succeed if retried.
-</Note>
-
-#### Phase 3: Garbage collection (background)
-
-See [Garbage Collection](#garbage-collection) below.
-
-### Window Progression
-
-The backfill processes a single 30-day window, covering the maximum range allowed by Garmin (data from the last 30 days before the user connected to the developer app):
-
-```
-Window 0:  [now - 30d,  now]
-```
-
-The anchor timestamp is fixed at backfill start so all date boundaries are consistent.
-
-**Per-window flow:**
-
-1. For each of the 5 types: trigger -> await webhook or timeout -> next type
-2. `persist_window_results()` copies flat type status keys to per-window matrix keys
-3. `advance_window()` increments the window counter and resets flat keys to "pending"
-4. If more windows remain, trigger the first type for the new window
-
-**Cancel support:** The cancel flag is checked between types and between windows. When cancelled, the current window's results are persisted and the backfill stops gracefully.
-
-### Retry Phase
-
-After the window completes, the system checks for timed-out entries:
-
-- `get_retry_targets()` reads the `timed_out_types` JSON list from Redis
-- Deduplicates by keeping only the latest (highest) window per type
-- Each target is retried once using the same `trigger_backfill_for_type` infrastructure
-- The retry uses the original window's date range (not the current sequential window)
-- The main window counter is not modified during retry
-
-**Escalation rules:**
-
-- Webhook arrives during retry: type marked `done` in matrix
-- Timeout during retry: type escalated to `failed` (not `timed_out`)
-- `failed` is a terminal state with no further retries
-
-### Garbage Collection
-
-<Info>
-**File:** `backend/app/integrations/celery/tasks/garmin/gc_task.py`
-</Info>
-
-A Celery beat task runs every 3 minutes to detect and clear stuck backfills:
-
-```mermaid
-graph TD
-    A["gc_stuck_backfills<br/>(every 180s via Celery beat)"] --> B["SCAN Redis for<br/>garmin:backfill:*:lock"]
-    B --> C{"Locks found?"}
-    C -->|"None"| D["No-op"]
-    C -->|"Yes"| E{"is_retry_phase?"}
-    E -->|"Yes"| F["Skip<br/>(don't interrupt retries)"]
-    E -->|"No"| G{"is_stuck?<br/>(no activity > 10 min)"}
-    G -->|"No"| H["Skip"]
-    G -->|"Yes"| I["clear_stuck_backfill"]
-    I --> J["Increment attempt_count"]
-    J --> K["Mark triggered type<br/>as timed_out"]
-    K --> L["Release backfill lock<br/>(preserves window data)"]
-    L --> M{"attempt_count >= 3?"}
-    M -->|"Yes"| N["Set permanently_failed"]
-    M -->|"No"| O["Available for<br/>re-trigger"]
-```
-
-**Design choices:**
-
-- GC preserves completed window data -- only the lock is cleared
-- The currently-triggered type is recorded for retry via `record_timed_out_entry()`
-- After lock release, the user can re-trigger backfill (via disconnect/reconnect)
-- After 3 GC cycles (`GC_MAX_ATTEMPTS`), the backfill is marked permanently failed
-- GC skips users in an active retry phase to avoid interference
-- When no backfills are active, the task is essentially a no-op (one empty SCAN)
-
-**Detection timeline:** A stuck backfill is detected within ~13 minutes (10-min threshold + up to 3-min scan interval).
-
-### Redis Key Schema
-
-All keys use the prefix `garmin:backfill:{user_id}:` and have a 7-day TTL.
-
-#### Lock and control
-
-| Key | Type | Purpose |
-|-----|------|---------|
-| `:lock` | string | Exclusive backfill lock (SETNX, ~1.4h TTL) |
-| `:trace_id` | string | Session-level trace ID for log correlation |
-| `:cancel_flag` | string | Set to "1" to request graceful cancellation |
-| `:permanently_failed` | string | Set to "1" after 3 GC cycles |
-| `:attempt_count` | integer | GC attempt counter (INCR) |
-
-#### Window tracking
-
-| Key | Type | Purpose |
-|-----|------|---------|
-| `:window:current` | integer | Current window index (0-based) |
-| `:window:total` | integer | Total windows (1) |
-| `:window:anchor_ts` | ISO timestamp | Fixed reference for date range calculations |
-| `:window:completed_count` | integer | Number of completed windows |
-
-#### Per-type flat keys (current window)
-
-| Key | Type | Values |
-|-----|------|--------|
-| `:types:{type}:status` | string | `pending`, `triggered`, `success`, `timed_out`, `failed` |
-| `:types:{type}:triggered_at` | ISO timestamp | When the backfill request was sent |
-| `:types:{type}:completed_at` | ISO timestamp | When webhook data arrived |
-| `:types:{type}:error` | string | Error message if failed |
-| `:types:{type}:trace_id` | string | Per-type trace ID |
-| `:types:{type}:skip_count` | integer | Number of timeouts for this type |
-
-#### Per-window matrix keys (persisted history)
-
-| Key | Type | Values |
-|-----|------|--------|
-| `:w:{window}:{type}:status` | string | `done`, `pending`, `timed_out`, `failed` |
-
-These are written by `persist_window_results()` when advancing to the next window, and by `update_window_cell()` during retry.
-
-#### Retry phase keys
-
-| Key | Type | Purpose |
-|-----|------|---------|
-| `:retry_phase` | string | "1" when retry phase is active |
-| `:retry_targets` | JSON list | Remaining `[{type, window}]` entries to retry |
-| `:retry_current_window` | integer | Window index of the current retry target |
-| `:retry_current_type` | string | Data type being retried |
-
-#### Timeout tracking
-
-| Key | Type | Purpose |
-|-----|------|---------|
-| `:timed_out_types` | JSON list | All timed-out entries `[{type, window}]` for retry |
-
-## API Endpoints
-
-<Info>
-**File:** `backend/app/api/routes/v1/sync_data.py`
-
-All endpoints require API key authentication (`ApiKeyDep`).
-</Info>
-
-### GET /api/v1/providers/garmin/users/\{user_id\}/backfill/status
-
-Returns the full backfill status matrix.
-
-**Response:**
+Native observations are acknowledged even when an upstream schema change
+prevents normalization. In that case the response remains `200`,
+`normalization_errors` increases, and `errors` contains only the provider record
+ID and the stable code `schema_drift`. It never echoes source payloads.
 
 ```json
 {
-  "overall_status": "in_progress",
-  "current_window": 0,
-  "total_windows": 1,
-  "windows": {
-    "0": {"sleeps": "done", "dailies": "done", "activities": "timed_out", "activityDetails": "done", "hrv": "pending"}
-  },
-  "summary": {
-    "sleeps": {"done": 1, "timed_out": 0, "failed": 0},
-    "dailies": {"done": 1, "timed_out": 0, "failed": 0},
-    "activities": {"done": 0, "timed_out": 1, "failed": 0},
-    "activityDetails": {"done": 1, "timed_out": 0, "failed": 0},
-    "hrv": {"done": 0, "timed_out": 0, "failed": 0}
-  },
-  "in_progress": true,
-  "retry_phase": false,
-  "retry_type": null,
-  "retry_window": null,
-  "attempt_count": 0,
-  "max_attempts": 3,
-  "permanently_failed": false
+  "batch_id": "90f4f0e7-c0a4-4de5-8dfc-f0414660764f",
+  "committed": 1,
+  "inserted": 1,
+  "updated": 0,
+  "unchanged": 0,
+  "rejected": 0,
+  "normalization_errors": 1,
+  "errors": [{"provider_record_id": "activity-404", "code": "schema_drift"}]
 }
 ```
 
-**`overall_status` values:**
+### Supported endpoint manifest
 
-| Value | Meaning |
-|-------|---------|
-| `pending` | No backfill started |
-| `in_progress` | Actively processing windows |
-| `retry_in_progress` | In retry phase |
-| `complete` | All windows processed |
-| `cancelled` | User-initiated cancellation |
-| `permanently_failed` | Failed after 3 GC cycles |
+The checked-in manifest is the source of truth. It rejects arbitrary bridge
+method names before any write.
 
-### POST /api/v1/providers/garmin/users/\{user_id\}/backfill/cancel
+| Kind | Source method | Cadence/request policy | Stable key | No-data response |
+|---|---|---|---|---|
+| `sleeps` | `get_sleep_data` | Daily; one local date | Sleep ID | Empty object |
+| `dailies` | `get_stats`, `get_user_summary` | Daily; one local date | Profile date | Empty object |
+| `heart_rates` | `get_heart_rates` | Daily; one local date | Profile date | Empty object |
+| `hrv` | `get_hrv_data` | Daily; one local date | Profile date | `null` |
+| `pulse_ox` | `get_spo2_data` | Daily; one local date | Profile date | Empty object |
+| `respiration` | `get_respiration_data` | Daily; one local date | Profile date | Empty object |
+| `body_compositions` | `get_body_composition` | Daily; one local date | Timestamp + sequence | Empty list |
+| `stress_details` | `get_stress_data` | Daily; one local date | Profile date | Empty object |
+| `body_battery` | `get_body_battery` | Daily; one local date | Profile date + sequence | Empty list |
+| `blood_pressures` | `get_blood_pressure` | Daily; one local date | Timestamp + sequence | Empty list |
+| `skin_temperature` | `get_skin_temperature` | Daily; one local date | Profile date | Empty object |
+| `user_metrics` | `get_max_metrics` | Daily; one local date | Profile date | Empty object |
+| `fitness_age` | `get_fitnessage_data` | Weekly; one local date | Profile date | Empty object |
+| `training_readiness` | `get_training_readiness` | Daily; one local date | Timestamp + sequence | Empty list |
+| `training_status` | `get_training_status` | Daily; one local date | Profile date | Empty object |
+| `training_load` | `get_training_load_focus` | Daily; one local date | Profile date | Empty object |
+| `activities` | `get_activities_by_date` | Seven-day overlap; explicit bounded date range | Activity ID | Empty list |
+| `activity_details` | `get_activity` | On change; one activity ID | Activity ID | Not found |
+| `activity_laps` | `get_activity_splits` | On change; one activity ID | Activity ID | Empty object |
+| `activity_routes` | `get_activity_gps_data` | On change; one activity ID | Activity ID | Empty object |
+| `devices` | `get_devices` | Weekly; one bounded list | Device ID | Empty list |
 
-Requests graceful cancellation. The backfill stops after the current type completes or times out.
+Some kinds are intentionally native-only until their normalized schema is
+stable. They are still scrubbed, hashed, stored, and counted.
 
-Returns 409 Conflict if no backfill is in progress.
+## Idempotency and corrections
 
-### POST /api/v1/providers/garmin/users/\{user_id\}/backfill/\{type_name\}/retry
+Open Wearables recursively removes credential-like keys from both canonical and
+native JSON, serializes the result deterministically, and recomputes SHA-256.
+The database identity is `(user, garmin, kind, provider_record_id)`:
 
-Retries a specific timed-out type. Valid types: `sleeps`, `dailies`, `activities`, `activityDetails`, `hrv`.
+- the same scrubbed content is `unchanged` and skips normalization;
+- changed content updates the observation and normalized projections;
+- corrected activities keep the same Open Wearables event ID while times,
+  duration, and details change.
 
-## Frontend Integration
+The bridge-supplied hash is contract evidence only; it is never trusted as the
+stored hash.
 
-### TypeScript Types
+## Original FIT activity import
 
-<Info>
-**File:** `frontend/src/lib/api/types.ts`
-</Info>
+Enable FIT retention with a private S3-compatible bucket:
 
-```typescript
-interface BackfillWindowStatus {
-  [dataType: string]: 'done' | 'pending' | 'timed_out' | 'failed';
-}
+```dotenv config/.env
+STORE_FIT_FILES=true
+RAW_PAYLOAD_S3_BUCKET=open-wearables-private
+RAW_PAYLOAD_S3_ENDPOINT_URL=https://s3.example.internal
+AWS_ACCESS_KEY_ID=fit-prefix-writer
+AWS_SECRET_ACCESS_KEY=replace-in-secret-manager
+AWS_REGION=us-west-2
+```
 
-interface BackfillTypeSummary {
-  done: number;
-  timed_out: number;
-  failed: number;
-}
+The runtime identity needs only list/get/put/delete access to
+`fit-files/garmin/*`. Keep public access disabled and do not generate public or
+long-lived signed URLs.
 
-interface GarminBackfillStatus {
-  overall_status: 'pending' | 'in_progress' | 'complete'
-    | 'cancelled' | 'retry_in_progress' | 'permanently_failed';
-  current_window: number;
-  total_windows: number;
-  windows: Record<string, BackfillWindowStatus>;
-  summary: Record<string, BackfillTypeSummary>;
-  in_progress: boolean;
-  retry_phase: boolean;
-  retry_type: string | null;
-  retry_window: number | null;
-  attempt_count: number;
-  max_attempts: number;
-  permanently_failed: boolean;
+An activity JSON record must exist before its FIT asset can be attached:
+
+```bash
+curl --fail-with-body \
+  --request PUT \
+  --url "http://open-wearables:8000/api/v1/internal/users/176be8de-8452-4eb7-a7ea-147fec925d9d/imports/garmin/activities/987654/fit" \
+  --header "Authorization: Bearer ${GARMIN_BRIDGE_INGEST_SECRET:?missing secret}" \
+  --header "Content-Type: application/vnd.ant.fit" \
+  --header "X-Garmin-Contract-Version: 1" \
+  --header "X-Garmin-Source-Updated-At: 2026-07-20T02:14:05Z" \
+  --data-binary @activity-987654.fit
+```
+
+Successful response:
+
+```json
+{
+  "activity_id": "987654",
+  "event_record_id": "231a54af-c4b7-4370-8ca0-8da790a2895a",
+  "status": "inserted",
+  "object_key": "fit-files/garmin/176be8de-8452-4eb7-a7ea-147fec925d9d/987654/6e92c3f4a4108045d0790bf0dc6dca0bf95c3798682129151ca085df9da2b99b.fit",
+  "payload_sha256": "6e92c3f4a4108045d0790bf0dc6dca0bf95c3798682129151ca085df9da2b99b",
+  "byte_count": 48217,
+  "decode_status": "decoded",
+  "decoded_messages": 1854
 }
 ```
 
-### React Hooks
+Open Wearables checks the 50 MiB limit and FIT header before upload. It stores content-addressed bytes
+with `application/vnd.ant.fit` and server-side AES-256 encryption. The parser
+counts at most 500,000 decoded messages, inventories fields, and extracts up to
+1,000 compact records of each supported metadata kind without allocating
+per-second database samples. Omitted compact-record counts are retained in the
+manifest. Parser or CRC
+failure retains the source object and writes a failure manifest for later
+reprocessing.
 
-<Info>
-**File:** `frontend/src/hooks/api/use-health.ts`
-</Info>
+## Status codes and retry behavior
 
-| Hook | Purpose | Polling |
-|------|---------|---------|
-| `useGarminBackfillStatus(userId, enabled)` | Fetches backfill status | Every 10s while `in_progress` or `retry_in_progress` |
-| `useGarminCancelBackfill(userId)` | Cancel mutation | Invalidates status cache on success |
-| `useRetryGarminBackfill(userId)` | Retry single type | Invalidates status cache on success |
+| Status | Meaning | Bridge action |
+|---|---|---|
+| `200` | Transaction committed; inspect counts and normalization errors | Advance acknowledged cursor |
+| `400` | Invalid `Content-Length` | Fix request; do not retry unchanged input |
+| `401` | Missing or incorrect bridge bearer secret | Stop and repair secret configuration |
+| `404` | Open Wearables user or Garmin activity does not exist | Reconcile identity or import activity first |
+| `413` | JSON, native record, or FIT asset exceeds its bound | Reduce batch/record; do not blindly retry |
+| `415` | Incorrect `Content-Type` | Send JSON or `application/vnd.ant.fit` as required |
+| `422` | Invalid schema, timestamp, contract version, kind/method pair, or FIT header | Fix the contract; do not retry unchanged input |
+| `503` | Ingest secret or FIT storage is unavailable | Retry with bounded exponential backoff |
 
-### API Service
+All successful responses include `Cache-Control: no-store`.
 
-<Info>
-**File:** `frontend/src/lib/api/services/health.service.ts`
-</Info>
+## Deletion, retention, and recovery
 
-| Method | Endpoint |
-|--------|----------|
-| `getGarminBackfillStatus(userId)` | `GET /api/v1/providers/garmin/users/{userId}/backfill/status` |
-| `cancelGarminBackfill(userId)` | `POST /api/v1/providers/garmin/users/{userId}/backfill/cancel` |
-| `retryGarminBackfill(userId, typeName)` | `POST /api/v1/providers/garmin/users/{userId}/backfill/{typeName}/retry` |
+`DELETE /api/v1/internal/users/{open_wearables_user_id}/imports/garmin` removes
+the user's Garmin native observations, normalized records, health scores,
+credentialless connection rows, and every FIT object under that user's prefix.
+It then recomputes affected internal sleep scores from the remaining providers.
+Object deletion must succeed before the database transaction commits, so a
+failed deletion is retry-safe.
 
-### Connection Card UI
+```bash
+curl --fail-with-body \
+  --request DELETE \
+  --url "http://open-wearables:8000/api/v1/internal/users/176be8de-8452-4eb7-a7ea-147fec925d9d/imports/garmin" \
+  --header "Authorization: Bearer ${GARMIN_BRIDGE_INGEST_SECRET:?missing secret}"
+```
 
-<Info>
-**File:** `frontend/src/components/user/connection-card.tsx`
-</Info>
+```json
+{
+  "user_id": "176be8de-8452-4eb7-a7ea-147fec925d9d",
+  "provider": "garmin",
+  "native_records_deleted": 32,
+  "data_sources_deleted": 1,
+  "health_scores_deleted": 4,
+  "connections_deleted": 0,
+  "fit_objects_deleted": 3
+}
+```
 
-The Garmin connection card renders different states:
-
-| State | Display |
-|-------|---------|
-| `in_progress` | Progress bar with backfill status, cancel button |
-| `retry_in_progress` | "Retrying \{Type\} (window N)..." with spinner |
-| `complete` | Completion indicator |
-| `cancelled` | Cancelled state message |
-| `permanently_failed` | Error message: "Backfill failed after 3 attempts. Please disconnect and reconnect your Garmin." |
-
-**Additional elements:**
-
-- **Attempt counter:** "Attempt N of 3" shown when `attempt_count > 0`
-- **Timed-out types:** Listed with amber/warning styling, each with a Retry button
-- **Failed types:** Listed with red/destructive styling, no retry (terminal state)
-- The visual distinction between timed_out (amber) and failed (red) communicates that timed-out types may succeed on retry while failed types are permanent
-
-## Data Types
-
-### Backfill types (5)
-
-These are actively requested during historical backfill:
-
-| Type | API Endpoint | Data |
-|------|-------------|------|
-| `sleeps` | `/wellness-api/rest/backfill/sleeps` | Sleep sessions with stages |
-| `dailies` | `/wellness-api/rest/backfill/dailies` | Daily summaries (steps, calories, HR) |
-| `activities` | `/wellness-api/rest/backfill/activities` | Activity/workout summaries |
-| `activityDetails` | `/wellness-api/rest/backfill/activityDetails` | Detailed activity data (laps, samples) |
-| `hrv` | `/wellness-api/rest/backfill/hrv` | Heart rate variability |
-
-### Webhook-only types (11)
-
-These are not requested during backfill but are accepted when Garmin sends them via webhook:
-
-`epochs`, `bodyComps`, `stressDetails`, `allDayRespiration`, `pulseox`, `bloodPressures`, `userMetrics`, `skinTemp`, `healthSnapshot`, `moveIQActivities`, `mct`
-
-### Processing
-
-<Info>
-**File:** `backend/app/services/providers/garmin/data_247.py`
-</Info>
-
-All data types are processed by `Garmin247Data` which handles:
-
-- Fetching data from callback URLs
-- Parsing type-specific payload formats
-- Converting timestamps (Unix epoch seconds to UTC datetimes)
-- Batch inserting into PostgreSQL with deduplication
-- Two record types: `DataPointSeries` (continuous metrics) and `EventRecords` (discrete events: sleep sessions, activities, menstrual cycle summaries)
-
-## File Reference
-
-### Backend
-
-| File | Purpose |
-|------|---------|
-| `backend/app/services/providers/garmin/strategy.py` | `GarminStrategy` -- provider entry point composing OAuth, data, and workout services |
-| `backend/app/services/providers/garmin/oauth.py` | `GarminOAuth` -- OAuth 2.0 + PKCE implementation |
-| `backend/app/services/providers/garmin/data_247.py` | `Garmin247Data` -- webhook data parsing and DB insertion for all 16 types |
-| `backend/app/services/providers/garmin/workouts.py` | `GarminWorkouts` -- activity/workout data handling |
-| `backend/app/services/providers/garmin/handlers/backfill.py` | `GarminBackfillService` -- triggers backfill requests to Garmin API |
-| `backend/app/services/providers/garmin/backfill_config.py` | All configuration constants (types, timeouts, windows, rate limits) |
-| `backend/app/integrations/celery/tasks/garmin/backfill_task.py` | Backfill state machine -- lock, trigger, timeout, window, retry, status |
-| `backend/app/integrations/celery/tasks/garmin/gc_task.py` | Garbage collector -- stuck detection and cleanup |
-| `backend/app/integrations/celery/core.py` | Celery app config and beat schedule |
-| `backend/app/integrations/celery/tasks/__init__.py` | Re-exports for all task functions |
-| `backend/app/api/routes/v1/garmin_webhooks.py` | PING/PUSH webhook handlers |
-| `backend/app/api/routes/v1/sync_data.py` | Status, cancel, and retry API endpoints |
-| `backend/app/api/routes/v1/oauth.py` | OAuth callback that triggers backfill |
-
-### Frontend
-
-| File | Purpose |
-|------|---------|
-| `frontend/src/lib/api/types.ts` | `GarminBackfillStatus`, `BackfillWindowStatus`, `BackfillTypeSummary` |
-| `frontend/src/lib/api/services/health.service.ts` | API methods for status, cancel, retry |
-| `frontend/src/hooks/api/use-health.ts` | `useGarminBackfillStatus`, `useGarminCancelBackfill`, `useRetryGarminBackfill` |
-| `frontend/src/components/user/connection-card.tsx` | Backfill progress rendering, cancel/retry UI |
+Back up PostgreSQL, the application encryption key, and the FIT bucket according
+to the deployment's recovery objectives. Test both restore and provider purge.
+Deploy compatible bridge and Open Wearables image versions together; contract
+version `1` is the compatibility boundary. Rotate the bridge secret by updating
+both services during a controlled deployment, and never place it in browser
+configuration, logs, source control, or bridge job payloads.

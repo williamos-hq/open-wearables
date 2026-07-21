@@ -12,6 +12,7 @@ Usage (one-liner at ingestion point):
     store_raw_payload(source="webhook", provider="garmin", payload=data)
 """
 
+import hashlib
 import json
 import logging
 import sys
@@ -29,6 +30,10 @@ _s3_bucket: str | None = None
 _s3_prefix: str = "raw-payloads"
 _s3_client: Any = None
 _fit_files_enabled: bool = False
+
+
+class FitStorageError(RuntimeError):
+    """Raised when durable FIT storage cannot acknowledge an operation."""
 
 
 def configure(
@@ -198,34 +203,116 @@ def _store_to_s3(
         logger.exception("Failed to store raw payload to S3: s3://%s/%s", _s3_bucket, key)
 
 
+def fit_storage_enabled() -> bool:
+    return _fit_files_enabled and _s3_client is not None and _s3_bucket is not None
+
+
+def put_fit_file(
+    *,
+    provider: str,
+    fit_bytes: bytes,
+    user_id: str,
+    activity_id: str,
+) -> str:
+    """Durably store a content-addressed FIT object and return its key."""
+    if not _fit_files_enabled:
+        raise FitStorageError("FIT storage is disabled")
+    if _s3_client is None or _s3_bucket is None:
+        raise FitStorageError("FIT storage is not configured")
+
+    digest = hashlib.sha256(fit_bytes).hexdigest()
+    key = f"fit-files/{provider}/{user_id}/{activity_id}/{digest}.fit"
+    try:
+        _s3_client.put_object(
+            Bucket=_s3_bucket,
+            Key=key,
+            Body=fit_bytes,
+            ContentType="application/vnd.ant.fit",
+            ServerSideEncryption="AES256",
+            Metadata={
+                "provider": provider,
+                "user_id": user_id,
+                "activity_id": str(activity_id),
+                "sha256": digest,
+            },
+        )
+        logger.debug("Stored FIT file to S3: s3://%s/%s (%d bytes)", _s3_bucket, key, len(fit_bytes))
+    except Exception as exc:
+        log_structured(logger, "error", "Failed to store FIT file to S3", bucket=_s3_bucket, key=key)
+        raise FitStorageError("FIT object upload failed") from exc
+    return key
+
+
+def delete_fit_file(key: str, *, best_effort: bool = False) -> bool:
+    if _s3_client is None or _s3_bucket is None:
+        if best_effort:
+            return False
+        raise FitStorageError("FIT storage is not configured")
+    try:
+        _s3_client.delete_object(Bucket=_s3_bucket, Key=key)
+    except Exception as exc:
+        if best_effort:
+            log_structured(logger, "warning", "Failed to delete superseded FIT object", key=key)
+            return False
+        raise FitStorageError("FIT object deletion failed") from exc
+    return True
+
+
+def delete_fit_prefix(provider: str, user_id: str) -> int:
+    if _s3_client is None or _s3_bucket is None:
+        raise FitStorageError("FIT storage is not configured")
+    prefix = f"fit-files/{provider}/{user_id}/"
+    deleted = 0
+    continuation_token: str | None = None
+    try:
+        while True:
+            kwargs: dict[str, Any] = {"Bucket": _s3_bucket, "Prefix": prefix, "MaxKeys": 1000}
+            if continuation_token:
+                kwargs["ContinuationToken"] = continuation_token
+            response = _s3_client.list_objects_v2(**kwargs)
+            objects = [{"Key": item["Key"]} for item in response.get("Contents", []) if item.get("Key")]
+            if objects:
+                deletion = _s3_client.delete_objects(
+                    Bucket=_s3_bucket,
+                    Delete={"Objects": objects, "Quiet": True},
+                )
+                if deletion.get("Errors"):
+                    raise FitStorageError("FIT prefix deletion was only partially acknowledged")
+                deleted += len(objects)
+            if not response.get("IsTruncated"):
+                break
+            continuation_token = response.get("NextContinuationToken")
+            if not continuation_token:
+                raise FitStorageError("FIT object listing returned an invalid continuation token")
+    except FitStorageError:
+        raise
+    except Exception as exc:
+        raise FitStorageError("FIT prefix deletion failed") from exc
+    return deleted
+
+
+def purge_fit_prefix(provider: str, user_id: str, *, required: bool = False) -> int:
+    """Delete a user's FIT objects when configured, failing if known objects require it."""
+    if not fit_storage_enabled():
+        if required:
+            raise FitStorageError("FIT storage is not configured")
+        return 0
+    return delete_fit_prefix(provider, user_id)
+
+
 def store_fit_file(
     *,
     provider: str,
     fit_bytes: bytes,
     user_id: str,
     activity_id: str,
-) -> None:
-    """Store a raw FIT file to S3. No-op when STORE_FIT_FILES is disabled.
-
-    Key format: fit-files/{provider}/{YYYY-MM-DD}/{user_id}/{activity_id}.fit
-    Uses the same S3 client and bucket as raw payload storage.
-    """
+) -> str | None:
+    """Backward-compatible wrapper for provider webhook callers."""
     if not _fit_files_enabled:
-        return
-    if _s3_client is None or _s3_bucket is None:
-        log_structured(logger, "warning", "Cannot store FIT file — S3 not configured")
-        return
-
-    now = datetime.now(UTC)
-    key = f"fit-files/{provider}/{now.strftime('%Y-%m-%d')}/{user_id}/{activity_id}.fit"
-    try:
-        _s3_client.put_object(
-            Bucket=_s3_bucket,
-            Key=key,
-            Body=fit_bytes,
-            ContentType="application/octet-stream",
-            Metadata={"provider": provider, "user_id": user_id, "activity_id": str(activity_id)},
-        )
-        logger.debug("Stored FIT file to S3: s3://%s/%s (%d bytes)", _s3_bucket, key, len(fit_bytes))
-    except Exception:
-        log_structured(logger, "error", "Failed to store FIT file to S3", bucket=_s3_bucket, key=key)
+        return None
+    return put_fit_file(
+        provider=provider,
+        fit_bytes=fit_bytes,
+        user_id=user_id,
+        activity_id=activity_id,
+    )

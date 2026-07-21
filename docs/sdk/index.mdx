@@ -16,7 +16,7 @@ keywords: ["wearable sync sdk", "healthkit sdk", "health connect sdk", "mobile h
 
 Open Wearables Sync SDKs enable seamless background synchronization of health data directly from **Apple HealthKit** (iOS), **Samsung Health**, and **Health Connect** (Android) to the Open Wearables platform.
 
-Unlike cloud-based providers (Garmin, Polar, Suunto) that use webhooks and OAuth, on-device health stores require a **push-based model** where data is sent from the user's device to your backend.
+Unlike official cloud-based providers such as Polar and Suunto, on-device health stores require a **push-based model** where data is sent from the user's device to your backend. Garmin uses the private bridge import in this fork.
 
 <Note>
   **Why Push-Based?** Apple HealthKit, Samsung Health, and Health Connect don't expose cloud APIs. Health data lives exclusively on the user's device, so the mobile app must actively push data to your backend.

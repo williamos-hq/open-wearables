@@ -142,8 +142,8 @@ class GarminWebhookHandler(BaseWebhookHandler):
 
         store_raw_payload(source="webhook", provider="garmin", payload=payload, trace_id=request_trace_id)
 
-        # garmin_sync is isolated from the default queue so high-volume live-push
-        # events and backfill-chain tasks don't starve each other.
+        # Legacy official-webhook behavior. Public Garmin webhook routes return
+        # 404 and the fork's worker does not consume this queue.
         task = celery_app.send_task(_PROCESS_PUSH_TASK, args=["garmin", payload, request_trace_id], queue="garmin_sync")
         log_structured(
             logger,

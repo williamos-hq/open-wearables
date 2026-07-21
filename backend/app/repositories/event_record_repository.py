@@ -29,6 +29,7 @@ from app.database import DbSession
 from app.models import DataPointSeries, DataSource, EventRecord, SleepDetails
 from app.models.workout_details import WorkoutDetails
 from app.repositories.data_source_repository import DataSourceRepository
+from app.repositories.provider_native_record_repository import NativeWriteStatus
 from app.repositories.repositories import CrudRepository
 from app.schemas.enums import ProviderName, SeriesType, get_series_type_id
 from app.schemas.model_crud.activities import (
@@ -50,7 +51,13 @@ class EventRecordRepository(
         super().__init__(model)
         self.data_source_repo = DataSourceRepository()
 
-    def _build_creation(self, db_session: DbSession, creator: EventRecordCreate) -> tuple[UUID, EventRecord]:
+    def _build_creation(
+        self,
+        db_session: DbSession,
+        creator: EventRecordCreate,
+        *,
+        commit_data_source: bool = True,
+    ) -> tuple[UUID, EventRecord]:
         """Resolve the data source and build the ORM object without touching the session."""
         if creator.data_source_id:
             data_source_id = creator.data_source_id
@@ -67,6 +74,7 @@ class EventRecordRepository(
                 device_model=creator.device_model,
                 source=creator.source,
                 software_version=creator.software_version,
+                commit=commit_data_source,
             )
             data_source_id = data_source.id
 
@@ -113,6 +121,78 @@ class EventRecordRepository(
         if provider is not None:
             query = query.filter(DataSource.provider == provider)
         return query.one_or_none()
+
+    def get_sleep_dates_by_user_provider(
+        self,
+        db_session: DbSession,
+        user_id: UUID,
+        provider: str,
+    ) -> list[tuple[datetime, str | None]]:
+        rows = (
+            db_session.query(self.model.start_datetime, self.model.zone_offset)
+            .join(DataSource, self.model.data_source_id == DataSource.id)
+            .filter(
+                DataSource.user_id == user_id,
+                DataSource.provider == provider,
+                self.model.category == "sleep",
+            )
+            .all()
+        )
+        return [(row.start_datetime, row.zone_offset) for row in rows]
+
+    def upsert_by_external_id(
+        self,
+        db_session: DbSession,
+        creator: EventRecordCreate,
+    ) -> tuple[EventRecord, NativeWriteStatus]:
+        """Insert or update a provider event while preserving its Open Wearables ID."""
+        if not creator.external_id:
+            raise ValueError("external_id is required for provider event upserts")
+
+        data_source_id, creation = self._build_creation(db_session, creator, commit_data_source=False)
+        provider = creator.provider or self.data_source_repo.infer_provider_from_source(creator.source).value
+        existing = (
+            db_session.query(self.model)
+            .join(DataSource, self.model.data_source_id == DataSource.id)
+            .filter(
+                DataSource.user_id == creator.user_id,
+                DataSource.provider == provider,
+                self.model.external_id == creator.external_id,
+            )
+            .with_for_update()
+            .one_or_none()
+        )
+        if existing is not None:
+            for column in (
+                "category",
+                "type",
+                "source_name",
+                "duration_seconds",
+                "start_datetime",
+                "end_datetime",
+                "zone_offset",
+            ):
+                setattr(existing, column, getattr(creation, column))
+            existing.data_source_id = data_source_id
+            db_session.flush()
+            return existing, "updated"
+
+        nested = db_session.begin_nested()
+        try:
+            db_session.add(creation)
+            db_session.flush()
+            nested.commit()
+            return creation, "inserted"
+        except IntegrityError:
+            nested.rollback()
+            existing_by_time = self._fetch_existing(db_session, data_source_id, creation)
+            if existing_by_time is None:
+                raise
+            existing_by_time.external_id = creator.external_id
+            for column in ("category", "type", "source_name", "duration_seconds", "zone_offset"):
+                setattr(existing_by_time, column, getattr(creation, column))
+            db_session.flush()
+            return existing_by_time, "updated"
 
     def delete_by_external_id(
         self,

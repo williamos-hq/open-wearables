@@ -1,8 +1,6 @@
 """Tests for Garmin strategy."""
 
-from app.services.providers.garmin.oauth import GarminOAuth
 from app.services.providers.garmin.strategy import GarminStrategy
-from app.services.providers.garmin.workouts import GarminWorkouts
 
 
 class TestGarminStrategy:
@@ -24,50 +22,27 @@ class TestGarminStrategy:
         assert strategy.display_name == "Garmin"
 
     def test_has_cloud_api(self) -> None:
-        """Garmin should have cloud API support."""
+        """Garmin is not exposed as a cloud API in the import-only fork."""
         strategy = GarminStrategy()
-        assert strategy.has_cloud_api is True
+        assert strategy.has_cloud_api is False
 
     def test_icon_url(self) -> None:
         """Icon URL should point to Garmin SVG icon."""
         strategy = GarminStrategy()
         assert strategy.icon_url == "/static/provider-icons/garmin.svg"
 
-    def test_oauth_component_initialized(self) -> None:
-        """OAuth component should be initialized."""
+    def test_official_io_components_are_not_initialized(self) -> None:
+        """Import-only Garmin must not expose official provider clients."""
         strategy = GarminStrategy()
-        assert strategy.oauth is not None
-        assert isinstance(strategy.oauth, GarminOAuth)
+        assert strategy.oauth is None
+        assert strategy.workouts is None
+        assert strategy.data_247 is None
+        assert strategy.webhooks is None
 
-    def test_workouts_component_initialized(self) -> None:
-        """Workouts component should be initialized."""
-        strategy = GarminStrategy()
-        assert strategy.workouts is not None
-        assert isinstance(strategy.workouts, GarminWorkouts)
-
-    def test_oauth_has_correct_provider_name(self) -> None:
-        """OAuth component should have correct provider name."""
-        strategy = GarminStrategy()
-        assert strategy.oauth is not None
-        assert strategy.oauth.provider_name == "garmin"
-
-    def test_oauth_has_correct_api_base_url(self) -> None:
-        """OAuth component should have correct API base URL."""
-        strategy = GarminStrategy()
-        assert strategy.oauth is not None
-        assert strategy.oauth.api_base_url == "https://apis.garmin.com"
-
-    def test_workouts_has_correct_provider_name(self) -> None:
-        """Workouts component should have correct provider name."""
-        strategy = GarminStrategy()
-        assert strategy.workouts is not None
-        assert strategy.workouts.provider_name == "garmin"
-
-    def test_workouts_has_correct_api_base_url(self) -> None:
-        """Workouts component should have correct API base URL."""
-        strategy = GarminStrategy()
-        assert strategy.workouts is not None
-        assert strategy.workouts.api_base_url == "https://apis.garmin.com"
+    def test_bridge_normalizer_is_explicitly_available(self) -> None:
+        normalizer = GarminStrategy().create_normalizer()
+        assert normalizer.provider_name == "garmin"
+        assert normalizer.api_base_url == "https://apis.garmin.com"
 
     def test_repositories_initialized(self) -> None:
         """All required repositories should be initialized."""

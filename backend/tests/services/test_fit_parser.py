@@ -5,7 +5,8 @@ import fitdecode
 import pytest
 
 from app.schemas.enums.series_types import SeriesType
-from app.services.fit_parser import FitParseResult, parse_fit_file
+from app.services import fit_parser
+from app.services.fit_parser import FitMessageLimitError, FitParseResult, parse_fit_file
 from tests.fixtures.fit_builder import make_cycling_fit, make_running_fit, make_swimming_fit
 
 USER_ID = uuid4()
@@ -149,3 +150,48 @@ class TestInvalidInput:
     def test_garbage_bytes_raises(self) -> None:
         with pytest.raises(fitdecode.FitError):
             parse_fit_file(b"not a fit file at all", uuid4(), uuid4())
+
+    def test_invalid_crc_raises(self) -> None:
+        invalid = bytearray(make_running_fit())
+        invalid[-1] ^= 0xFF
+        with pytest.raises(fitdecode.FitCRCError):
+            parse_fit_file(bytes(invalid), uuid4(), uuid4())
+
+
+class TestBoundedMetadataMode:
+    def test_collect_samples_false_still_counts_and_inventories(self) -> None:
+        result = parse_fit_file(
+            make_running_fit(),
+            uuid4(),
+            source="garmin",
+            collect_samples=False,
+            max_messages=500_000,
+        )
+        assert result.samples == []
+        assert result.message_count > 0
+        assert result.message_counts["record"] > 0
+        assert "heart_rate" in result.standard_fields_found
+        assert result.protocol_version is not None
+        assert result.profile_version is not None
+
+    def test_message_limit_is_enforced(self) -> None:
+        with pytest.raises(FitMessageLimitError):
+            parse_fit_file(make_running_fit(), uuid4(), collect_samples=False, max_messages=1)
+
+    def test_compact_metadata_is_bounded(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(fit_parser, "FIT_MAX_COMPACT_RECORDS_PER_KIND", 0)
+        result = FitParseResult(compact_metadata={"sessions": []})
+
+        assert fit_parser._append_compact_metadata(result, "sessions", {"sport": "running"}) is False
+        assert result.compact_metadata == {"sessions": []}
+        assert result.compact_metadata_omitted == {"sessions": 1}
+
+    def test_segments_and_field_names_are_bounded(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(fit_parser, "FIT_MAX_SEGMENTS_PER_KIND", 0)
+        monkeypatch.setattr(fit_parser, "FIT_MAX_FIELD_NAMES_PER_TYPE", 0)
+        result = parse_fit_file(make_running_fit(), uuid4(), collect_samples=False)
+
+        assert result.segments == []
+        assert result.segment_records_omitted == {"lap": 2}
+        assert result.standard_fields_found == []
+        assert result.field_names_omitted["standard"] > 0

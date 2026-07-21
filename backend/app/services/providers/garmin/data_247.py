@@ -1,4 +1,4 @@
-"""Garmin 247 Data implementation for sleep, dailies, epochs, and body composition."""
+"""Garmin health normalizers plus legacy official-API code retained upstream."""
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -51,11 +51,9 @@ _ACTIVITY_DETAILS_SERIES_TYPES: frozenset[SeriesType] = frozenset(st for _, st i
 class Garmin247Data(Base247DataTemplate):
     """Garmin implementation for 247 data (sleep, dailies, epochs, body composition).
 
-    Garmin Health API constraints:
-    - All timestamps are UTC Unix seconds
-    - Maximum query range: 24 hours per request
-    - Data retention: ~7 days (backfill service can retrieve up to 5 years)
-    - Parameters: uploadStartTimeInSeconds, uploadEndTimeInSeconds
+    The bridge adapter calls only the normalization/build helpers. Official API
+    fetch methods are unreachable through routes and scheduled tasks in this
+    import-only fork.
     """
 
     CHUNK_HOURS = 24  # Garmin API max range per request

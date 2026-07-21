@@ -291,6 +291,13 @@ class UserConnectionRepository(CrudRepository[UserConnection, UserConnectionCrea
         db_session.commit()
         return result.rowcount
 
+    def delete_by_user_provider(self, db_session: DbSession, user_id: UUID, provider: str) -> int:
+        return (
+            db_session.query(self.model)
+            .filter(self.model.user_id == user_id, self.model.provider == provider)
+            .delete(synchronize_session=False)
+        )
+
     def mark_as_revoked(self, db_session: DbSession, connection: UserConnection) -> UserConnection:
         """Mark connection as revoked (when refresh token fails)."""
         connection.status = ConnectionStatus.REVOKED

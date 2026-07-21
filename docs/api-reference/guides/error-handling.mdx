@@ -64,7 +64,7 @@ keywords: ["open wearables api errors", "health api error handling", "wearable a
 
 ```json
 {
-  "detail": "User not connected to garmin"
+  "detail": "User not connected to polar"
 }
 ```
 
@@ -72,14 +72,14 @@ keywords: ["open wearables api errors", "health api error handling", "wearable a
 
 **Solution:** Complete the OAuth flow first:
 ```bash
-GET /api/v1/oauth/garmin/authorize?user_id={user_id}
+GET /api/v1/oauth/polar/authorize?user_id={user_id}
 ```
 
 ### Token Expired
 
 ```json
 {
-  "detail": "Token expired and no refresh token available for garmin"
+  "detail": "Token expired and no refresh token available for polar"
 }
 ```
 
@@ -87,7 +87,7 @@ Or:
 
 ```json
 {
-  "detail": "Garmin authorization expired. Please re-authorize."
+  "detail": "Polar authorization expired. Please re-authorize."
 }
 ```
 
@@ -95,7 +95,7 @@ Or:
 
 **Solution:** User needs to reconnect via OAuth:
 ```bash
-GET /api/v1/oauth/garmin/authorize?user_id={user_id}
+GET /api/v1/oauth/polar/authorize?user_id={user_id}
 ```
 
 ### Provider Doesn't Support OAuth

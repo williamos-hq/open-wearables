@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from app.database import DbSession
 from app.models import User
+from app.repositories.provider_native_record_repository import ProviderNativeRecordRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.model_crud.user_management import (
     UserCreate,
@@ -18,6 +19,7 @@ from app.schemas.model_crud.user_management import (
 from app.schemas.utils import OldPaginatedResponse
 from app.services.providers.factory import ProviderFactory
 from app.services.providers.garmin.backfill_state import force_release_backfill_lock
+from app.services.raw_payload_storage import purge_fit_prefix
 from app.services.services import AppService
 from app.services.sync_coordination import release_stale_primary
 from app.services.user_connection_service import user_connection_service
@@ -68,6 +70,11 @@ class UserService(AppService[UserRepository, User, UserCreateInternal, UserUpdat
         user = self.get(db_session, object_id, raise_404=raise_404)
         if not user:
             return None
+
+        native_repo = ProviderNativeRecordRepository()
+        fit_object_keys = native_repo.get_fit_object_keys(db_session, user.id)
+        purge_fit_prefix("garmin", str(user.id), required=bool(fit_object_keys))
+
         provider_factory = ProviderFactory()
         connections = list(user_connection_service.get_connections_by_user(db_session, user.id))
         for connection in connections:

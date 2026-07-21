@@ -1,5 +1,6 @@
 """Tests for raw payload storage backends."""
 
+import hashlib
 import json
 from unittest.mock import MagicMock, patch
 
@@ -16,6 +17,7 @@ def _reset_module_state() -> None:
     raw_payload_storage._s3_bucket = None
     raw_payload_storage._s3_prefix = "raw-payloads"
     raw_payload_storage._s3_client = None
+    raw_payload_storage._fit_files_enabled = False
 
 
 class TestConfigure:
@@ -140,3 +142,91 @@ class TestStoreRawPayload:
 
         call_kwargs = mock_client.put_object.call_args[1]
         assert call_kwargs["Body"] == b'{"pre":"serialized"}'
+
+
+class TestFitStorage:
+    def test_put_is_content_addressed_private_and_encrypted(self) -> None:
+        mock_client = MagicMock()
+        with patch.object(raw_payload_storage, "_create_s3_client", return_value=mock_client):
+            raw_payload_storage.configure(
+                "disabled",
+                1024,
+                s3_bucket="private-bucket",
+                fit_files_enabled=True,
+            )
+
+        fit_bytes = b"\x0e\x20\x00\x00\x00\x00\x00\x00.FITsource"
+        digest = hashlib.sha256(fit_bytes).hexdigest()
+        key = raw_payload_storage.put_fit_file(
+            provider="garmin",
+            fit_bytes=fit_bytes,
+            user_id="user-123",
+            activity_id="987654",
+        )
+
+        assert key == f"fit-files/garmin/user-123/987654/{digest}.fit"
+        call = mock_client.put_object.call_args.kwargs
+        assert call["Bucket"] == "private-bucket"
+        assert call["ContentType"] == "application/vnd.ant.fit"
+        assert call["ServerSideEncryption"] == "AES256"
+        assert call["Metadata"]["sha256"] == digest
+
+    def test_put_failure_is_explicit(self) -> None:
+        mock_client = MagicMock()
+        mock_client.put_object.side_effect = RuntimeError("unavailable")
+        with patch.object(raw_payload_storage, "_create_s3_client", return_value=mock_client):
+            raw_payload_storage.configure(
+                "disabled",
+                1024,
+                s3_bucket="private-bucket",
+                fit_files_enabled=True,
+            )
+
+        with pytest.raises(raw_payload_storage.FitStorageError):
+            raw_payload_storage.put_fit_file(
+                provider="garmin",
+                fit_bytes=b"fit",
+                user_id="user-123",
+                activity_id="987654",
+            )
+
+    def test_delete_prefix_paginates(self) -> None:
+        mock_client = MagicMock()
+        mock_client.list_objects_v2.side_effect = [
+            {
+                "Contents": [{"Key": "fit-files/garmin/user-123/1/a.fit"}],
+                "IsTruncated": True,
+                "NextContinuationToken": "next",
+            },
+            {
+                "Contents": [{"Key": "fit-files/garmin/user-123/2/b.fit"}],
+                "IsTruncated": False,
+            },
+        ]
+        mock_client.delete_objects.return_value = {"Errors": []}
+        raw_payload_storage._s3_bucket = "private-bucket"
+        raw_payload_storage._s3_client = mock_client
+
+        assert raw_payload_storage.delete_fit_prefix("garmin", "user-123") == 2
+        assert mock_client.list_objects_v2.call_count == 2
+        assert mock_client.delete_objects.call_count == 2
+
+    def test_delete_prefix_rejects_partial_acknowledgement(self) -> None:
+        mock_client = MagicMock()
+        mock_client.list_objects_v2.return_value = {
+            "Contents": [{"Key": "fit-files/garmin/user-123/1/a.fit"}],
+            "IsTruncated": False,
+        }
+        mock_client.delete_objects.return_value = {"Errors": [{"Key": "a.fit", "Code": "AccessDenied"}]}
+        raw_payload_storage._s3_bucket = "private-bucket"
+        raw_payload_storage._s3_client = mock_client
+
+        with pytest.raises(raw_payload_storage.FitStorageError):
+            raw_payload_storage.delete_fit_prefix("garmin", "user-123")
+
+    def test_purge_prefix_requires_configuration_for_known_objects(self) -> None:
+        with pytest.raises(raw_payload_storage.FitStorageError):
+            raw_payload_storage.purge_fit_prefix("garmin", "user-123", required=True)
+
+    def test_purge_prefix_is_optional_without_known_objects(self) -> None:
+        assert raw_payload_storage.purge_fit_prefix("garmin", "user-123") == 0
