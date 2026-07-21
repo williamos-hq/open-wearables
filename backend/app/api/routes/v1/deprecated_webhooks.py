@@ -6,38 +6,16 @@ These paths were registered in production before the unified
 New integrations must use:
   POST /api/v1/providers/{provider}/webhooks
 
-Garmin compatibility paths intentionally return 404 in this import-only fork.
+Garmin compatibility paths are intentionally absent in this import-only fork.
 Oura and Strava paths remain for backward compatibility.
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 
 from .oura_webhooks import router as oura_webhooks_router
 from .strava_webhooks import router as strava_webhooks_router
 
 router = APIRouter()
-
-# ---------------------------------------------------------------------------
-# Garmin — official webhook ingestion is retired in this fork.
-# ---------------------------------------------------------------------------
-
-
-@router.post("/garmin/webhooks/ping")
-def garmin_webhook_ping_compat() -> None:
-    """Deprecated: POST /api/v1/garmin/webhooks/ping.
-
-    Garmin data must use the authenticated internal bridge import.
-    """
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
-
-
-@router.post("/garmin/webhooks/push")
-def garmin_webhook_push_compat() -> None:
-    """Deprecated: POST /api/v1/garmin/webhooks/push.
-
-    Garmin data must use the authenticated internal bridge import.
-    """
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Garmin webhooks are unavailable")
 
 
 # Oura and Strava — re-registered at old paths for completeness.

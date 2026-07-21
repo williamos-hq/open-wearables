@@ -42,7 +42,6 @@ class TestGarminStrategy:
     def test_bridge_normalizer_is_explicitly_available(self) -> None:
         normalizer = GarminStrategy().create_normalizer()
         assert normalizer.provider_name == "garmin"
-        assert normalizer.api_base_url == "https://apis.garmin.com"
 
     def test_repositories_initialized(self) -> None:
         """All required repositories should be initialized."""

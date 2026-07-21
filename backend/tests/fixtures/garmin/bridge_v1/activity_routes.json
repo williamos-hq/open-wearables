@@ -1,0 +1,30 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000019",
+  "kind": "activity_routes",
+  "source_method": "get_activity_gps_data",
+  "records": [
+    {
+      "provider_record_id": "987654",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "9c503aca80d5a1f1ba0a135e4e0665084ef312e8115e8030bb46700713700bb4",
+      "canonical": {
+        "activityId": 987654,
+        "geoPolylineDTO": {
+          "polyline": [
+            "encoded-route"
+          ]
+        }
+      },
+      "native": {
+        "activityId": 987654,
+        "geoPolylineDTO": {
+          "polyline": [
+            "encoded-route"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "contract_version": 1,
+  "batch_id": "33333333-3333-4333-8333-333333333333",
+  "kind": "training_readiness",
+  "source_method": "get_training_readiness",
+  "records": [
+    {
+      "provider_record_id": "profile-123:training_readiness:2026-07-19T06:30:00-07:00:0",
+      "source_recorded_at": "2026-07-19T06:30:00-07:00",
+      "source_updated_at": "2026-07-19T13:31:00Z",
+      "payload_sha256": "78243beaa39771f6a95e503bb1125cc1f4a574125f4624d00a5a24cf3cf7aed7",
+      "canonical": {
+        "score": 76,
+        "level": "MODERATE",
+        "inputContext": "POST_WAKEUP"
+      },
+      "native": {
+        "calendarDate": "2026-07-19",
+        "timestampLocal": "2026-07-19T06:30:00-07:00",
+        "score": 76,
+        "level": "MODERATE",
+        "inputContext": "POST_WAKEUP"
+      }
+    }
+  ]
+}

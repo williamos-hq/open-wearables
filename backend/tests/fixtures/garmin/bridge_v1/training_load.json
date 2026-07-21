@@ -1,0 +1,24 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000016",
+  "kind": "training_load",
+  "source_method": "get_training_load_focus",
+  "records": [
+    {
+      "provider_record_id": "profile-123:training_load:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "c391acbf7e759a640e669fb67da63ae4cbd7d7ed31471d0475dfff2496713109",
+      "canonical": {
+        "calendarDate": "2026-07-19",
+        "acuteLoad": 612,
+        "loadFocus": "BALANCED"
+      },
+      "native": {
+        "calendarDate": "2026-07-19",
+        "acuteLoad": 612,
+        "loadFocus": "BALANCED"
+      }
+    }
+  ]
+}

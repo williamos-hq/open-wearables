@@ -1,0 +1,28 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000011",
+  "kind": "blood_pressures",
+  "source_method": "get_blood_pressure",
+  "records": [
+    {
+      "provider_record_id": "profile-123:blood_pressures:1784462400:0",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "edcd874b3463dbfa367132374eb564e2a16015f87c19ae9186a63940780de76c",
+      "canonical": {
+        "summaryId": "bp-2026-07-19",
+        "measurementTimeInSeconds": 1784462400,
+        "measurementTimeOffsetInSeconds": -25200,
+        "systolic": 112,
+        "diastolic": 73
+      },
+      "native": {
+        "summaryId": "bp-2026-07-19",
+        "measurementTimeInSeconds": 1784462400,
+        "measurementTimeOffsetInSeconds": -25200,
+        "systolic": 112,
+        "diastolic": 73
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000012",
+  "kind": "skin_temperature",
+  "source_method": "get_skin_temperature",
+  "records": [
+    {
+      "provider_record_id": "profile-123:skin_temperature:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "a3adc298412492787cf1a87fabc9aaa52141c3061583f4b88f0ef75d83b540cd",
+      "canonical": {
+        "summaryId": "skin-2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "skinTemperature": 33.4
+      },
+      "native": {
+        "summaryId": "skin-2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "skinTemperature": 33.4
+      }
+    }
+  ]
+}

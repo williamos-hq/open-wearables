@@ -1,0 +1,32 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000018",
+  "kind": "activity_laps",
+  "source_method": "get_activity_splits",
+  "records": [
+    {
+      "provider_record_id": "987654",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "359f905b1cb90f10aec49c9978b6177ca5fb4fcd2fd2ed16d924995f1c772265",
+      "canonical": {
+        "activityId": 987654,
+        "lapDTOs": [
+          {
+            "lapIndex": 1,
+            "distance": 1000
+          }
+        ]
+      },
+      "native": {
+        "activityId": 987654,
+        "lapDTOs": [
+          {
+            "lapIndex": 1,
+            "distance": 1000
+          }
+        ]
+      }
+    }
+  ]
+}

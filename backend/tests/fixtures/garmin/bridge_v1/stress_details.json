@@ -1,0 +1,40 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-00000000000f",
+  "kind": "stress_details",
+  "source_method": "get_stress_data",
+  "records": [
+    {
+      "provider_record_id": "profile-123:stress_details:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "65b0f04a24188499ea75662086009e585227f63f4023194d9f081aa6c22d42fd",
+      "canonical": {
+        "summaryId": "stress-2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "timeOffsetStressLevelValues": {
+          "0": 20,
+          "300": 25
+        },
+        "timeOffsetBodyBatteryValues": {
+          "0": 78,
+          "300": 76
+        }
+      },
+      "native": {
+        "summaryId": "stress-2026-07-19",
+        "startTimeInSeconds": 1784462400,
+        "startTimeOffsetInSeconds": -25200,
+        "timeOffsetStressLevelValues": {
+          "0": 20,
+          "300": 25
+        },
+        "timeOffsetBodyBatteryValues": {
+          "0": 78,
+          "300": 76
+        }
+      }
+    }
+  ]
+}

@@ -18,7 +18,6 @@ from app.schemas.model_crud.user_management import (
 )
 from app.schemas.utils import OldPaginatedResponse
 from app.services.providers.factory import ProviderFactory
-from app.services.providers.garmin.backfill_state import force_release_backfill_lock
 from app.services.raw_payload_storage import purge_fit_prefix
 from app.services.services import AppService
 from app.services.sync_coordination import release_stale_primary
@@ -94,19 +93,16 @@ class UserService(AppService[UserRepository, User, UserCreateInternal, UserUpdat
                     error=str(e),
                 )
 
-        # Release any Redis locks held by this user before DB deletion.
-        # Must happen before DB delete so we still have provider_user_id from connections.
+        # Release pull locks before DB deletion while provider_user_id is available.
         try:
             for connection in connections:
                 if connection.provider_user_id:
-                    for scope in ("pull", "backfill"):
-                        release_stale_primary(connection.provider, connection.provider_user_id, scope=scope)
-            force_release_backfill_lock(user.id)
+                    release_stale_primary(connection.provider, connection.provider_user_id, scope="pull")
         except Exception as e:
             log_structured(
                 self.logger,
                 "warning",
-                "Failed to release Redis locks on user deletion",
+                "Failed to release Redis pull locks on user deletion",
                 user_id=user.id,
                 error=str(e),
             )

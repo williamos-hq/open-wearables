@@ -1,0 +1,32 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-00000000000e",
+  "kind": "body_compositions",
+  "source_method": "get_body_composition",
+  "records": [
+    {
+      "provider_record_id": "profile-123:body_compositions:1784462400:0",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "d6a36a92175bbface3ad2a2ee831d3d20032cbcad5d82c308446cbaf84332793",
+      "canonical": {
+        "summaryId": "body-2026-07-19",
+        "measurementTimeInSeconds": 1784462400,
+        "measurementTimeOffsetInSeconds": -25200,
+        "weightInGrams": 75000,
+        "bodyFatInPercent": 18.5,
+        "bodyMassIndex": 23.5,
+        "muscleMassInGrams": 35000
+      },
+      "native": {
+        "summaryId": "body-2026-07-19",
+        "measurementTimeInSeconds": 1784462400,
+        "measurementTimeOffsetInSeconds": -25200,
+        "weightInGrams": 75000,
+        "bodyFatInPercent": 18.5,
+        "bodyMassIndex": 23.5,
+        "muscleMassInGrams": 35000
+      }
+    }
+  ]
+}

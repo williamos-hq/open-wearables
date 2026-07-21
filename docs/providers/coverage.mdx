@@ -18,13 +18,13 @@ This guide gives an overview of data type support across the integrated wearable
 
 | Capability | Apple | Garmin | Polar | Suunto | Oura | Whoop | Ultrahuman | Strava | Fitbit | Health Connect |
 |------------|:-----:|:------:|:-----:|:------:|:----:|:-----:|:----------:|:------:|:------:|:--------------:|
-| **OAuth** | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **OAuth** | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Workouts** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ |
 | **Sleep** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | 🔜 | ✅ |
 | **24/7 Data** | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | ❌ | 🔜 | ✅ |
 | **Timeseries** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ◐ | 🔜 | ✅ |
 | **Health Scores** | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Women's Health** | 🔜 | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | 🔜 |
+| **Women's Health** | 🔜 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | 🔜 |
 
 <Accordion title="Legend">
   - ✅ **Full support** — Fully implemented and collecting data
@@ -54,7 +54,7 @@ This guide gives an overview of data type support across the integrated wearable
 | `heart_rate` | bpm | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `heart_rate_recovery_one_minute` | bpm | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `heart_rate_variability_rmssd` | ms | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ |
-| `heart_rate_variability_sdnn` | ms | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| `heart_rate_variability_sdnn` | ms | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
 | `resting_heart_rate` | bpm | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
 | `walking_heart_rate_average` | bpm | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
@@ -156,24 +156,20 @@ This guide gives an overview of data type support across the integrated wearable
 
 | Metric | Unit | Apple | Fitbit | Garmin | Google | Oura | Polar | Samsung | Strava | Suunto | Ultrahuman | Whoop |
 |------|------|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
-| `cadence` | rpm | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `cadence` | rpm | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `estimated_workout_effort_score` | score | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `power` | watts | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `speed` | m_per_s | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `power` | watts | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `speed` | m_per_s | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `workout_effort_score` | score | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ### Environmental
 
 | Metric | Unit | Apple | Fitbit | Garmin | Google | Oura | Polar | Samsung | Strava | Suunto | Ultrahuman | Whoop |
 |------|------|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
-| `air_temperature` | celsius | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `elevation` | meters | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `environmental_audio_exposure` | dB | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `environmental_sound_reduction` | dB | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `headphone_audio_exposure` | dB | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `inhaler_usage` | count | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `latitude` | degrees | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `longitude` | degrees | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `time_in_daylight` | minutes | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `uv_exposure` | count | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `water_temperature` | celsius | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -215,11 +211,11 @@ This guide gives an overview of data type support across the integrated wearable
 | `energy_burned` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | `heart_rate_avg` | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | `heart_rate_max` | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `heart_rate_min` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| `heart_rate_min` | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
 | `max_speed` | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `max_watts` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
 | `moving_time_seconds` | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `steps_count` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| `steps_count` | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
 | `total_elevation_gain` | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
 
 ---
@@ -244,21 +240,6 @@ This guide gives an overview of data type support across the integrated wearable
 
 | Field | Apple | Fitbit | Garmin | Google | Oura | Polar | Samsung | Strava | Suunto | Ultrahuman | Whoop |
 |------|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
-| `current_phase` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `current_phase_type` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `cycle_length` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `day_in_cycle` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `days_until_next_phase` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `fertile_window_start` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `has_specified_cycle_length` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `has_specified_period_length` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `is_predicted_cycle` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `last_updated_at` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `length_of_current_phase` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `length_of_fertile_window` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `period_length` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `predicted_cycle_length` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `pregnancy_snapshot` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ---
 
@@ -268,7 +249,7 @@ This guide gives an overview of data type support across the integrated wearable
 |------|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|
 | `activity` | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `body_battery` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `readiness` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `readiness` | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `recovery` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ |
 | `sleep` | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `strain` | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -300,11 +281,11 @@ Key differences and limitations to be aware of when working with each provider:
   - A separate bridge owns Garmin Connect authentication, MFA, polling, overlap windows, cooldowns, and cursors
   - Open Wearables accepts only checked-in health and activity methods through a bounded, versioned contract
   - Scrubbed native observations preserve unknown fields while stable concepts are normalized
-  - Full sleep processing with stages (deep, light, REM, awake), duration, efficiency score, and heart rate biometrics
+  - Full sleep processing with stages (deep, light, REM, awake), duration, and efficiency score
   - Continuous 24/7 timeseries data: heart rate, steps, energy, HRV (RMSSD, overnight sleep window), stress levels, body battery, respiratory rate, SpO2, and more
   - Body composition from Garmin Index scale: weight, body fat %, BMI
   - Garmin-specific metrics: stress level, body battery, fitness age, skin temperature
-  - 135+ workout type mappings to unified taxonomy
+  - 135+ workout type mappings to the shared taxonomy, plus distance, calories, heart rate, elevation gain, speed, and cadence
   - Original FIT files preserve routes, samples, laps, zones, device provenance, and strength-set metadata without expanding every sample into PostgreSQL
   - Official Garmin OAuth, webhooks, vendor reads, and backfill routes are unavailable in this fork
 </Accordion>

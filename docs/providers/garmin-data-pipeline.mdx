@@ -145,13 +145,16 @@ ID and the stable code `schema_drift`. It never echoes source payloads.
 
 ### Supported endpoint manifest
 
-The checked-in manifest is the source of truth. It rejects arbitrary bridge
+The checked-in
+[`bridge_manifest_v1.json`](https://github.com/williamos-hq/open-wearables/blob/main/backend/app/services/providers/garmin/bridge_manifest_v1.json)
+file is the source of truth. The bridge mirrors that file and both repositories
+test their generated requests against it. Open Wearables rejects arbitrary
 method names before any write.
 
 | Kind | Source method | Cadence/request policy | Stable key | No-data response |
 |---|---|---|---|---|
 | `sleeps` | `get_sleep_data` | Daily; one local date | Sleep ID | Empty object |
-| `dailies` | `get_stats`, `get_user_summary` | Daily; one local date | Profile date | Empty object |
+| `dailies` | `get_stats` | Daily; one local date | Profile date | Empty object |
 | `heart_rates` | `get_heart_rates` | Daily; one local date | Profile date | Empty object |
 | `hrv` | `get_hrv_data` | Daily; one local date | Profile date | `null` |
 | `pulse_ox` | `get_spo2_data` | Daily; one local date | Profile date | Empty object |
@@ -250,7 +253,7 @@ reprocessing.
 | `200` | Transaction committed; inspect counts and normalization errors | Advance acknowledged cursor |
 | `400` | Invalid `Content-Length` | Fix request; do not retry unchanged input |
 | `401` | Missing or incorrect bridge bearer secret | Stop and repair secret configuration |
-| `404` | Open Wearables user or Garmin activity does not exist | Reconcile identity or import activity first |
+| `404` | The Garmin activity required by a FIT upload does not exist | Import the activity summary first |
 | `413` | JSON, native record, or FIT asset exceeds its bound | Reduce batch/record; do not blindly retry |
 | `415` | Incorrect `Content-Type` | Send JSON or `application/vnd.ant.fit` as required |
 | `422` | Invalid schema, timestamp, contract version, kind/method pair, or FIT header | Fix the contract; do not retry unchanged input |
@@ -266,6 +269,8 @@ credentialless connection rows, and every FIT object under that user's prefix.
 It then recomputes affected internal sleep scores from the remaining providers.
 Object deletion must succeed before the database transaction commits, so a
 failed deletion is retry-safe.
+Deleting an already absent user or already purged Garmin dataset succeeds with
+zero deletion counts, so bridge retries are safe.
 
 ```bash
 curl --fail-with-body \

@@ -142,7 +142,8 @@ The platform's most powerful feature - define intelligent health insights using 
 Access health data through a consistent REST API regardless of the source device.
 
 ### Provider Support
-- ☁️ **Cloud-based**: Garmin, Oura, Whoop, Suunto, Polar, Ultrahuman, Strava, Fitbit
+- ☁️ **Cloud-based**: Oura, Whoop, Suunto, Polar, Ultrahuman, Strava, Fitbit
+- 🔒 **Private bridge import**: Garmin (WilliamOS fork only; no official Garmin OAuth or provider API access)
 - 📱 **SDK-based**: Apple HealthKit, Samsung Health, Google Health Connect
 
 ### OAuth Flow Management
@@ -151,6 +152,9 @@ Simplified connection process for end users:
 2. User authenticates with their wearable provider
 3. Data automatically syncs to your platform
 4. Access via unified API
+
+Garmin is not part of this OAuth flow in the WilliamOS fork. Its private bridge owns authentication and imports
+normalized observations through the internal Garmin ingest contract.
 
 ### Mobile Sync SDKs
 Native SDKs for push-based health data sync from on-device health stores:
@@ -180,8 +184,9 @@ The platform is designed for self-hosting, meaning each deployment serves a sing
 **Available**:
 - Developer portal
 - User management (via API and developer portal)
-- OAuth flow for Garmin, Polar, and Suunto
-- Workout data sync and API access for Garmin, Polar, and Suunto
+- OAuth flow for Polar and Suunto
+- Workout data sync and API access for Polar and Suunto
+- Garmin health and workout import through the private WilliamOS bridge
 - Mobile Sync SDKs (iOS, Android, Flutter, React Native)
 
 **In Development**:

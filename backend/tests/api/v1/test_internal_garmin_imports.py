@@ -1,7 +1,10 @@
+import hashlib
 import json
 from copy import deepcopy
+from dataclasses import asdict
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -21,14 +24,25 @@ from app.models import (
     WorkoutDetails,
 )
 from app.schemas.enums import HealthScoreCategory, ProviderName, SeriesType, get_series_type_id
-from app.services.providers.garmin.bridge_manifest import GARMIN_BRIDGE_ENDPOINTS
+from app.schemas.providers.garmin import GarminBridgeImportRequest
+from app.services.providers.garmin.bridge_manifest import (
+    GARMIN_BRIDGE_ENDPOINT_LIST,
+    GARMIN_BRIDGE_ENDPOINTS,
+    GARMIN_BRIDGE_MANIFEST_PATH,
+)
 from app.services.raw_payload_storage import FitStorageError
 from tests.fixtures.fit_builder import make_running_fit
 
 BRIDGE_SECRET = "test-garmin-bridge-ingest-secret"
+BRIDGE_FIXTURE_DIR = Path(__file__).parents[2] / "fixtures" / "garmin" / "bridge_v1"
 
 
 def test_checked_in_manifest_contains_only_bounded_named_pairs() -> None:
+    raw_manifest = json.loads(GARMIN_BRIDGE_MANIFEST_PATH.read_text(encoding="utf-8"))
+    assert raw_manifest == {
+        "contract_version": 1,
+        "endpoints": [asdict(endpoint) for endpoint in GARMIN_BRIDGE_ENDPOINT_LIST],
+    }
     assert GARMIN_BRIDGE_ENDPOINTS
     for (kind, source_method), endpoint in GARMIN_BRIDGE_ENDPOINTS.items():
         assert endpoint.kind == kind
@@ -36,6 +50,17 @@ def test_checked_in_manifest_contains_only_bounded_named_pairs() -> None:
         assert source_method.startswith("get_")
         assert endpoint.request_policy
         assert 1 <= endpoint.max_records <= 50
+    assert ("dailies", "get_user_summary") not in GARMIN_BRIDGE_ENDPOINTS
+    assert {
+        ("activity_details", "get_activity"),
+        ("activity_routes", "get_activity_gps_data"),
+        ("devices", "get_devices"),
+        ("training_load", "get_training_load_focus"),
+    }.issubset(GARMIN_BRIDGE_ENDPOINTS)
+
+
+def _bridge_fixture(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _headers(content_type: str = "application/json") -> dict[str, str]:
@@ -105,6 +130,65 @@ def _sleep(duration: int = 28_800, score: int = 82) -> dict:
         "awakeDurationInSeconds": 1_800,
         "overallSleepScore": {"value": score, "qualifier": "GOOD"},
     }
+
+
+def test_bridge_generated_contract_fixtures_create_all_core_projections(
+    client: TestClient,
+    db: Session,
+    user: User,
+) -> None:
+    path = f"/api/v1/internal/users/{user.id}/imports/garmin"
+    fixtures = {
+        _fixture_identity(fixture): fixture for fixture in map(_bridge_fixture, BRIDGE_FIXTURE_DIR.glob("*.json"))
+    }
+    assert set(fixtures) == set(GARMIN_BRIDGE_ENDPOINTS)
+    for fixture in fixtures.values():
+        GarminBridgeImportRequest.model_validate(fixture)
+        native_bytes = json.dumps(
+            fixture["records"][0]["native"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        assert fixture["records"][0]["payload_sha256"] == hashlib.sha256(native_bytes).hexdigest()
+
+    expected_key = f"fit-files/garmin/{user.id}/987654/fixture.fit"
+    with patch.object(settings, "garmin_bridge_ingest_secret", SecretStr(BRIDGE_SECRET)):
+        for endpoint in GARMIN_BRIDGE_ENDPOINT_LIST:
+            fixture = fixtures[(endpoint.kind, endpoint.source_method)]
+            response = client.post(path, json=fixture, headers=_headers())
+            assert response.status_code == 200
+            assert response.json()["normalization_errors"] == 0
+
+        with patch(
+            "app.api.routes.v1.internal_garmin_imports.put_fit_file",
+            return_value=expected_key,
+        ):
+            fit_response = client.put(
+                f"{path}/activities/987654/fit",
+                content=make_running_fit(),
+                headers={**_headers("application/vnd.ant.fit"), "X-Garmin-Contract-Version": "1"},
+            )
+
+    assert fit_response.status_code == 200
+    assert (
+        db.query(ProviderNativeRecord).filter_by(kind="activity_fit_asset").one().payload["object_key"] == expected_key
+    )
+    assert db.query(DataPointSeries).count() >= 6
+    assert {score.category for score in db.query(HealthScore).filter_by(provider=ProviderName.GARMIN).all()} >= {
+        HealthScoreCategory.STRESS,
+        HealthScoreCategory.SLEEP,
+        HealthScoreCategory.READINESS,
+    }
+    sleep = db.query(EventRecord).filter_by(category="sleep", external_id="sleep-2026-07-19").one()
+    workout = db.query(EventRecord).filter_by(category="workout", external_id="987654").one()
+    assert db.query(SleepDetails).filter_by(record_id=sleep.id).one().sleep_deep_minutes == 120
+    assert db.query(WorkoutDetails).filter_by(record_id=workout.id).one().segments
+
+
+def _fixture_identity(fixture: dict) -> tuple[str, str]:
+    return fixture["kind"], fixture["source_method"]
 
 
 def test_bridge_auth_is_dedicated_and_fail_closed(client: TestClient, user: User) -> None:
@@ -658,6 +742,56 @@ def test_purge_removes_database_records_and_fit_prefix(
     assert db.query(EventRecord).count() == 0
     assert db.query(WorkoutDetails).count() == 0
     assert db.query(HealthScore).filter_by(category=HealthScoreCategory.RESILIENCE).count() == 0
+
+
+def test_purge_is_idempotent_when_user_is_absent(client: TestClient) -> None:
+    user_id = uuid4()
+    with (
+        patch.object(settings, "garmin_bridge_ingest_secret", SecretStr(BRIDGE_SECRET)),
+        patch("app.api.routes.v1.internal_garmin_imports.purge_fit_prefix", return_value=0) as delete_prefix,
+    ):
+        response = client.delete(f"/api/v1/internal/users/{user_id}/imports/garmin", headers=_headers())
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": str(user_id),
+        "provider": "garmin",
+        "native_records_deleted": 0,
+        "data_sources_deleted": 0,
+        "health_scores_deleted": 0,
+        "connections_deleted": 0,
+        "fit_objects_deleted": 0,
+    }
+    delete_prefix.assert_called_once_with("garmin", str(user_id), required=False)
+
+
+def test_purge_without_garmin_rows_preserves_internal_scores(
+    client: TestClient,
+    db: Session,
+    user: User,
+) -> None:
+    score = HealthScore(
+        id=uuid4(),
+        user_id=user.id,
+        provider=ProviderName.INTERNAL,
+        category=HealthScoreCategory.RESILIENCE,
+        value=Decimal("44.2"),
+        recorded_at=datetime(2026, 7, 19, tzinfo=timezone.utc),
+    )
+    db.add(score)
+    db.flush()
+
+    with (
+        patch.object(settings, "garmin_bridge_ingest_secret", SecretStr(BRIDGE_SECRET)),
+        patch("app.api.routes.v1.internal_garmin_imports.purge_fit_prefix", return_value=0),
+    ):
+        response = client.delete(f"/api/v1/internal/users/{user.id}/imports/garmin", headers=_headers())
+
+    assert response.status_code == 200
+    assert response.json()["native_records_deleted"] == 0
+    assert response.json()["data_sources_deleted"] == 0
+    assert response.json()["health_scores_deleted"] == 0
+    assert db.query(HealthScore).filter_by(id=score.id).one().value == Decimal("44.2")
 
 
 def test_official_garmin_entry_points_are_unavailable(

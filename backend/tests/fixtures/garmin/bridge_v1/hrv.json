@@ -1,0 +1,36 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-00000000000b",
+  "kind": "hrv",
+  "source_method": "get_hrv_data",
+  "records": [
+    {
+      "provider_record_id": "profile-123:hrv:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "7c3dd22fb7fa9b07e3eee601db0efe0a1723b2eb24a77a87f1398fd67dcbf66b",
+      "canonical": {
+        "summaryId": "hrv-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "lastNightAvg": 48,
+        "hrvValues": {
+          "0": 44,
+          "300": 52
+        }
+      },
+      "native": {
+        "summaryId": "hrv-2026-07-19",
+        "calendarDate": "2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "lastNightAvg": 48,
+        "hrvValues": {
+          "0": 44,
+          "300": 52
+        }
+      }
+    }
+  ]
+}

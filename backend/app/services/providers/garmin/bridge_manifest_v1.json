@@ -1,0 +1,215 @@
+{
+  "contract_version": 1,
+  "endpoints": [
+    {
+      "kind": "sleeps",
+      "source_method": "get_sleep_data",
+      "normalization": "sleeps",
+      "cadence": "daily",
+      "key_rule": "sleep_id",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "dailies",
+      "source_method": "get_stats",
+      "normalization": "dailies",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "heart_rates",
+      "source_method": "get_heart_rates",
+      "normalization": "dailies",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "hrv",
+      "source_method": "get_hrv_data",
+      "normalization": "hrv",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "null",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "pulse_ox",
+      "source_method": "get_spo2_data",
+      "normalization": "pulse_ox",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "respiration",
+      "source_method": "get_respiration_data",
+      "normalization": "respiration",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "body_compositions",
+      "source_method": "get_body_composition",
+      "normalization": "body_compositions",
+      "cadence": "daily",
+      "key_rule": "measurement_timestamp_sequence",
+      "expected_no_data": "empty_list",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "stress_details",
+      "source_method": "get_stress_data",
+      "normalization": "stress_details",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "body_battery",
+      "source_method": "get_body_battery",
+      "normalization": "stress_details",
+      "cadence": "daily",
+      "key_rule": "profile_date_sequence",
+      "expected_no_data": "empty_list",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "blood_pressures",
+      "source_method": "get_blood_pressure",
+      "normalization": "blood_pressures",
+      "cadence": "daily",
+      "key_rule": "measurement_timestamp_sequence",
+      "expected_no_data": "empty_list",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "skin_temperature",
+      "source_method": "get_skin_temperature",
+      "normalization": "skin_temperature",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "user_metrics",
+      "source_method": "get_max_metrics",
+      "normalization": "user_metrics",
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "fitness_age",
+      "source_method": "get_fitnessage_data",
+      "normalization": "user_metrics",
+      "cadence": "weekly",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "training_readiness",
+      "source_method": "get_training_readiness",
+      "normalization": "training_readiness",
+      "cadence": "daily",
+      "key_rule": "profile_timestamp_sequence",
+      "expected_no_data": "empty_list",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "training_status",
+      "source_method": "get_training_status",
+      "normalization": null,
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "training_load",
+      "source_method": "get_training_load_focus",
+      "normalization": null,
+      "cadence": "daily",
+      "key_rule": "profile_date",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_local_date",
+      "max_records": 50
+    },
+    {
+      "kind": "activities",
+      "source_method": "get_activities_by_date",
+      "normalization": "activities",
+      "cadence": "overlap_7d",
+      "key_rule": "activity_id",
+      "expected_no_data": "empty_list",
+      "request_policy": "explicit_bounded_date_range",
+      "max_records": 50
+    },
+    {
+      "kind": "activity_details",
+      "source_method": "get_activity",
+      "normalization": "activity_details",
+      "cadence": "on_activity_change",
+      "key_rule": "activity_id",
+      "expected_no_data": "not_found",
+      "request_policy": "one_activity_id",
+      "max_records": 50
+    },
+    {
+      "kind": "activity_laps",
+      "source_method": "get_activity_splits",
+      "normalization": null,
+      "cadence": "on_activity_change",
+      "key_rule": "activity_id",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_activity_id",
+      "max_records": 50
+    },
+    {
+      "kind": "activity_routes",
+      "source_method": "get_activity_gps_data",
+      "normalization": null,
+      "cadence": "on_activity_change",
+      "key_rule": "activity_id",
+      "expected_no_data": "empty_object",
+      "request_policy": "one_activity_id",
+      "max_records": 50
+    },
+    {
+      "kind": "devices",
+      "source_method": "get_devices",
+      "normalization": null,
+      "cadence": "weekly",
+      "key_rule": "device_id",
+      "expected_no_data": "empty_list",
+      "request_policy": "single_bounded_list",
+      "max_records": 50
+    }
+  ]
+}

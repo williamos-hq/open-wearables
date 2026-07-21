@@ -500,7 +500,18 @@ class GarminBridgeImportService:
         return event.id
 
     def purge_user(self, db: DbSession, user_id: UUID) -> tuple[GarminPurgeResponse, list[str]]:
-        self.validate_user(db, user_id)
+        if self.user_repo.get(db, user_id) is None:
+            return (
+                GarminPurgeResponse(
+                    user_id=user_id,
+                    native_records_deleted=0,
+                    data_sources_deleted=0,
+                    health_scores_deleted=0,
+                    connections_deleted=0,
+                    fit_objects_deleted=0,
+                ),
+                [],
+            )
         object_keys = self.native_repo.get_fit_object_keys(db, user_id)
         sleep_dates: set[date] = {
             event_record_service._local_sleep_date(start_datetime, zone_offset)
@@ -510,16 +521,6 @@ class GarminBridgeImportService:
                 ProviderName.GARMIN.value,
             )
         }
-        resilience_dates = {
-            score.recorded_at.date()
-            for score in db.query(HealthScore)
-            .filter(
-                HealthScore.user_id == user_id,
-                HealthScore.provider == ProviderName.INTERNAL,
-                HealthScore.category == HealthScoreCategory.RESILIENCE,
-            )
-            .all()
-        }
         native_deleted = self.native_repo.delete_for_user(db, user_id)
         scores_deleted = self.score_repo.delete_by_user_provider(db, user_id, ProviderName.GARMIN.value)
         sources_deleted = self.data_source_repo.delete_by_user_provider(db, user_id, ProviderName.GARMIN)
@@ -527,7 +528,17 @@ class GarminBridgeImportService:
         db.flush()
         if sleep_dates:
             event_record_service._recompute_sleep_scores(db, user_id, sleep_dates)
-        if resilience_dates:
+        if sources_deleted:
+            resilience_dates = {
+                score.recorded_at.date()
+                for score in db.query(HealthScore)
+                .filter(
+                    HealthScore.user_id == user_id,
+                    HealthScore.provider == ProviderName.INTERNAL,
+                    HealthScore.category == HealthScoreCategory.RESILIENCE,
+                )
+                .all()
+            }
             self._recompute_resilience_scores(db, user_id, resilience_dates)
         return (
             GarminPurgeResponse(

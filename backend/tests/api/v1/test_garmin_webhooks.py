@@ -1,7 +1,5 @@
 """Regression tests for the import-only Garmin fork boundary."""
 
-from unittest.mock import patch
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -14,15 +12,13 @@ GARMIN_WEBHOOK_ROUTES = (
 
 @pytest.mark.parametrize("path", GARMIN_WEBHOOK_ROUTES)
 def test_garmin_webhook_routes_are_unavailable(client: TestClient, path: str) -> None:
-    with patch("app.services.providers.garmin.webhook_handler.celery_app") as mock_celery:
-        response = client.post(
-            path,
-            headers={"garmin-client-id": "obsolete-client-id"},
-            json={"activities": []},
-        )
+    response = client.post(
+        path,
+        headers={"garmin-client-id": "obsolete-client-id"},
+        json={"activities": []},
+    )
 
     assert response.status_code == 404
-    mock_celery.send_task.assert_not_called()
 
 
 def test_garmin_webhook_challenge_is_unavailable(client: TestClient) -> None:

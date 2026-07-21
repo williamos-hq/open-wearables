@@ -1,0 +1,44 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-000000000017",
+  "kind": "activity_details",
+  "source_method": "get_activity",
+  "records": [
+    {
+      "provider_record_id": "987654",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "b7952f7e527efdabaf893177b5522bb0849dc82e421acaf4ddf0fcee934933da",
+      "canonical": {
+        "summary": {
+          "activityId": 987654,
+          "activityType": "RUNNING",
+          "startTimeInSeconds": 1784462400,
+          "startTimeOffsetInSeconds": -25200,
+          "durationInSeconds": 1800,
+          "distanceInMeters": 5000,
+          "activeKilocalories": 350,
+          "averageHeartRateInBeatsPerMinute": 148,
+          "maxHeartRateInBeatsPerMinute": 172,
+          "deviceName": "Forerunner 955"
+        },
+        "samples": []
+      },
+      "native": {
+        "summary": {
+          "activityId": 987654,
+          "activityType": "RUNNING",
+          "startTimeInSeconds": 1784462400,
+          "startTimeOffsetInSeconds": -25200,
+          "durationInSeconds": 1800,
+          "distanceInMeters": 5000,
+          "activeKilocalories": 350,
+          "averageHeartRateInBeatsPerMinute": 148,
+          "maxHeartRateInBeatsPerMinute": 172,
+          "deviceName": "Forerunner 955"
+        },
+        "samples": []
+      }
+    }
+  ]
+}

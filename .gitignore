@@ -166,6 +166,8 @@ volumes
 
 *.json
 *.xml
+!backend/app/services/providers/garmin/bridge_manifest_v1.json
+!backend/tests/fixtures/garmin/bridge_v1/*.json
 
 # AI instruction local overrides (not committed)
 CLAUDE.local.md

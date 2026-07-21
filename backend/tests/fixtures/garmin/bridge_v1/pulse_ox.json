@@ -1,0 +1,34 @@
+{
+  "contract_version": 1,
+  "batch_id": "00000000-0000-0000-0000-00000000000c",
+  "kind": "pulse_ox",
+  "source_method": "get_spo2_data",
+  "records": [
+    {
+      "provider_record_id": "profile-123:pulse_ox:2026-07-19",
+      "source_recorded_at": "2026-07-19T12:00:00Z",
+      "source_updated_at": "2026-07-19T13:00:00Z",
+      "payload_sha256": "54e93465b3f6c9a989893b4a96b3fcf6b1aa37ade625425f76bc9e610b8ab88d",
+      "canonical": {
+        "summaryId": "spo2-2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "avgSpo2": 96,
+        "timeOffsetSpo2Values": {
+          "0": 96,
+          "300": 97
+        }
+      },
+      "native": {
+        "summaryId": "spo2-2026-07-19",
+        "startTimeInSeconds": 1784437200,
+        "startTimeOffsetInSeconds": -25200,
+        "avgSpo2": 96,
+        "timeOffsetSpo2Values": {
+          "0": 96,
+          "300": 97
+        }
+      }
+    }
+  ]
+}

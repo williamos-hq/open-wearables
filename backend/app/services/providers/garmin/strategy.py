@@ -5,13 +5,11 @@ from app.services.providers.base_strategy import (
 )
 from app.services.providers.garmin.coverage import (
     HEALTH_SCORES,
-    MENSTRUAL_CYCLE_FIELDS,
     SLEEP_FIELDS,
     TIMESERIES,
     WORKOUT_FIELDS,
 )
-from app.services.providers.garmin.data_247 import Garmin247Data
-from app.services.providers.garmin.oauth import GarminOAuth
+from app.services.providers.garmin.normalizer import GarminNormalizer
 
 
 class GarminStrategy(BaseProviderStrategy):
@@ -21,19 +19,9 @@ class GarminStrategy(BaseProviderStrategy):
     making provider network I/O unavailable through generic application paths.
     """
 
-    def create_normalizer(self) -> Garmin247Data:
-        """Build the retained upstream normalizer without exposing an I/O component."""
-        oauth = GarminOAuth(
-            user_repo=self.user_repo,
-            connection_repo=self.connection_repo,
-            provider_name=self.name,
-            api_base_url=self.api_base_url,
-        )
-        return Garmin247Data(
-            provider_name=self.name,
-            api_base_url=self.api_base_url,
-            oauth=oauth,
-        )
+    def create_normalizer(self) -> GarminNormalizer:
+        """Build the retained pure normalizer."""
+        return GarminNormalizer()
 
     @property
     def name(self) -> str:
@@ -58,6 +46,5 @@ class GarminStrategy(BaseProviderStrategy):
             timeseries=TIMESERIES,
             workout_fields=WORKOUT_FIELDS,
             sleep_fields=SLEEP_FIELDS,
-            menstrual_cycle_fields=MENSTRUAL_CYCLE_FIELDS,
             health_scores=HEALTH_SCORES,
         )

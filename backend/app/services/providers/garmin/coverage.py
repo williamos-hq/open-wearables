@@ -1,20 +1,7 @@
 from app.schemas.enums import SeriesType
 from app.schemas.enums.health_score_category import HealthScoreCategory
 
-# Timeseries mappings (handler key → SeriesType) consumed directly by data_247.py.
-
-# activityDetails.samples[] field → SeriesType (also reused for FIT-file parsing).
-# Note: Garmin API uses "Celcius" (sic) — matches the actual JSON field name.
-ACTIVITY_SAMPLE_SERIES: list[tuple[str, SeriesType]] = [
-    ("heartRate", SeriesType.heart_rate),
-    ("speedMetersPerSecond", SeriesType.speed),
-    ("stepsPerMinute", SeriesType.cadence),
-    ("powerInWatts", SeriesType.power),
-    ("elevationInMeters", SeriesType.elevation),
-    ("latitudeInDegree", SeriesType.latitude),
-    ("longitudeInDegree", SeriesType.longitude),
-    ("airTemperatureCelcius", SeriesType.air_temperature),
-]
+# Timeseries mappings consumed by the bridge normalizer.
 
 # Daily summary field → SeriesType (/wellness-api/rest/dailies).
 DAILIES_SERIES: list[tuple[str, SeriesType]] = [
@@ -26,25 +13,16 @@ DAILIES_SERIES: list[tuple[str, SeriesType]] = [
     ("active_time", SeriesType.active_time),
 ]
 
-# Epoch sample category → SeriesType (/wellness-api/rest/epochs).
-EPOCHS_SERIES: dict[str, SeriesType] = {
-    "heart_rate": SeriesType.heart_rate,
-    "steps": SeriesType.steps,
-    "energy": SeriesType.energy,
-}
-
 TIMESERIES: frozenset[SeriesType] = frozenset(
     {
-        *(st for _, st in ACTIVITY_SAMPLE_SERIES),  # /wellness-api/rest/activities (activityDetails + FIT)
         *(st for _, st in DAILIES_SERIES),  # /wellness-api/rest/dailies
-        *EPOCHS_SERIES.values(),  # /wellness-api/rest/epochs
+        SeriesType.heart_rate,  # /wellness-api/rest/heartRate
         SeriesType.weight,  # /wellness-api/rest/bodyComps
         SeriesType.body_fat_percentage,  # /wellness-api/rest/bodyComps
         SeriesType.body_mass_index,  # /wellness-api/rest/bodyComps
         SeriesType.skeletal_muscle_mass,  # /wellness-api/rest/bodyComps
-        SeriesType.heart_rate_variability_rmssd,  # /wellness-api/rest/hrv + healthSnapshot
-        SeriesType.heart_rate_variability_sdnn,  # /wellness-api/rest/healthSnapshot
-        SeriesType.garmin_stress_level,  # /wellness-api/rest/stressDetails + healthSnapshot
+        SeriesType.heart_rate_variability_rmssd,  # /wellness-api/rest/hrv
+        SeriesType.garmin_stress_level,  # /wellness-api/rest/stressDetails
         SeriesType.garmin_body_battery,  # /wellness-api/rest/stressDetails
         SeriesType.respiratory_rate,  # /wellness-api/rest/respiration + healthSnapshot
         SeriesType.oxygen_saturation,  # /wellness-api/rest/pulseOx + healthSnapshot
@@ -56,13 +34,11 @@ TIMESERIES: frozenset[SeriesType] = frozenset(
     }
 )
 
-# EventRecordDetail fields populated by workouts.py and data_247.py (workout records).
+# EventRecordDetail fields populated by the bridge normalizer (workout records).
 WORKOUT_FIELDS: frozenset[str] = frozenset(
     {
-        "heart_rate_min",
         "heart_rate_max",
         "heart_rate_avg",
-        "steps_count",
         "energy_burned",
         "distance",
         "average_cadence",
@@ -71,7 +47,7 @@ WORKOUT_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-# EventRecordDetail fields populated by data_247.py (sleep records).
+# EventRecordDetail fields populated by the bridge normalizer (sleep records).
 SLEEP_FIELDS: frozenset[str] = frozenset(
     {
         "sleep_total_duration_minutes",
@@ -86,31 +62,11 @@ SLEEP_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-# MenstrualCycleDetail fields populated by data_247.py (Garmin MCT cycle summaries).
-MENSTRUAL_CYCLE_FIELDS: frozenset[str] = frozenset(
-    {
-        "day_in_cycle",
-        "current_phase",
-        "current_phase_type",
-        "length_of_current_phase",
-        "days_until_next_phase",
-        "predicted_cycle_length",
-        "is_predicted_cycle",
-        "cycle_length",
-        "last_updated_at",
-        "has_specified_cycle_length",
-        "has_specified_period_length",
-        "period_length",
-        "fertile_window_start",
-        "length_of_fertile_window",
-        "pregnancy_snapshot",
-    }
-)
-
 HEALTH_SCORES: frozenset[HealthScoreCategory] = frozenset(
     {
         HealthScoreCategory.SLEEP,
         HealthScoreCategory.STRESS,
         HealthScoreCategory.BODY_BATTERY,
+        HealthScoreCategory.READINESS,
     }
 )
